@@ -1,0 +1,121 @@
+﻿<Window x:Class="ChatClient.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ChatClient" xmlns:viewmodel="clr-namespace:ChatClient.ViewModel"
+        mc:Ignorable="d"
+        Height="500" Width="800"
+        Background="#36393f"
+        WindowStyle="None"
+        AllowsTransparency="true"
+        ResizeMode="CanResizeWithGrip"
+        Title="MainWindow" Loaded="Window_Loaded" Closing="Window_Closing">
+    <Grid x:Name="Grid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="25"/>
+            <RowDefinition Height="75"/>
+            <RowDefinition />
+            <RowDefinition Height="75"/>
+        </Grid.RowDefinitions>
+        <Border Grid.ColumnSpan="2"
+                Background="#252525"
+                MouseDown="Border_MouseDown">
+
+            <Grid HorizontalAlignment="Stretch">
+                <Label Content="Anonumous Chat"
+                       Foreground="Gray"
+                       FontWeight="SemiBold"/>
+                <StackPanel HorizontalAlignment="Right"
+                            Orientation="Horizontal">
+                    <Button Width="20" Height="20"
+                            Content="🗕"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="Gray"
+                            FontWeight="Bold"
+                            Margin="0,0,0,2"
+                            Click="ButtonMinizime_Click"/>
+                    <Button Width="20" Height="20"
+                            Content="❐"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="Gray"
+                            FontWeight="Bold"
+                            Click="WindowButtonState_Click"/>
+                    <Button Width="20" Height="20"
+                            Content="✕"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="Gray"
+                            FontWeight="Bold"
+                            Click="CloseButton_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+        <Grid Background="#36393f"
+              Grid.Row="1">
+            <Grid HorizontalAlignment="Stretch">
+                <Label x:Name="Label1" HorizontalAlignment="Left"
+                       Content="Состояние: Стандартное"
+                       HorizontalContentAlignment="Center" 
+                       VerticalContentAlignment="Center"
+                       Height="75"
+                       Width="300"
+                       Foreground="LawnGreen"
+                       FontWeight="SemiBold" FontFamily="Arial">
+
+                </Label>
+                <StackPanel HorizontalAlignment="Stretch" 
+                            Height="75">
+                    <Button x:Name="Button1" HorizontalContentAlignment="Center"
+                            Height="75"
+                            Width="300"   
+                            Content="Найти собеседника"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="NavajoWhite"
+                            FontWeight="Bold"
+                            Click="ButtonFindAndCancelAndDisconnect_Click" FontSize="16" FontFamily="Arial">
+                        
+                    </Button>
+                    
+                </StackPanel>
+                <Label HorizontalAlignment="Right"
+                       Content="Поточное шифрование RC4"
+                       HorizontalContentAlignment="Center" 
+                       VerticalContentAlignment="Center"
+                       Height="75"
+                       Width="300"
+                       Foreground="FloralWhite"
+                       FontWeight="SemiBold" 
+                       FontFamily="Arial">
+                </Label>
+            </Grid>
+        </Grid>
+        <Grid Background="#36393f"
+              Grid.Row="2">
+            <ListView x:Name="ListView1" Margin="8,0,0,0"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      Foreground="Gray" FontSize="18" FontFamily="Arial">
+                        
+            </ListView>
+        </Grid>
+        <Grid Background="#36393f"
+              Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="TextBox2" Grid.Row="1"
+                     Height="50"
+                     HorizontalContentAlignment="Left"
+                     VerticalContentAlignment="Center"
+                     Grid.ColumnSpan="2" FontSize="16" KeyDown="TextBox2_KeyDown"
+                     Foreground="Gray"
+                     FontWeight="Medium"
+                     Margin="8" 
+                     Background="Transparent"/>
+        </Grid>
+    </Grid>
+</Window>
