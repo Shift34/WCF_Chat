@@ -22,6 +22,7 @@ namespace WCF_Chat
         void SendMessage(byte[] bytes, int identificator, int identificator1);
         [OperationContract(IsOneWay = true)]
         void SendMessageExit(string message, int identificator, int identificator1);
+
     }
 
     public interface IServerChatCallback

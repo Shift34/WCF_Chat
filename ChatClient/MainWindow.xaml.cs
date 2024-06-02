@@ -63,7 +63,7 @@ namespace ChatClient
         {
             client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));
             (ID, ID1) = client.Connect();
-            if (ID != -1)
+            if (ID1 != -1)
             {
                 Label1.Content = "Состояние: Ваш собеседник найден";
                 Button1.Content = "Отключиться";
@@ -168,12 +168,19 @@ namespace ChatClient
             }
             else if (state == State.Search)
             {
-                //DisconnectUser();
+                CancelSearch();
             }
             else
             {
                 DisconnectUser();
             }
+        }
+        private void CancelSearch()
+        {
+            client.RemoveUser(ID);
+            Label1.Content = "Состояние: Стандартное";
+            Button1.Content = "Найти собеседника";
+            state = State.NoSearch;
         }
         public enum State
         {

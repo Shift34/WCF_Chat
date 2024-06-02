@@ -36,9 +36,8 @@ namespace WCF_Chat
                 }
             }
             nextId++;
-            return (-1, -1);
+            return (user.ID, -1);
         }
-
         public void Disconnect(int identificator, int indetificator1)
         {
             var user = users.FirstOrDefault(i => i.ID == identificator); //поиск usera
