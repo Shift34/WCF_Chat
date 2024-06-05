@@ -31,8 +31,8 @@ namespace ChatClient
         {
             InitializeComponent();
             state = State.NoSearch;
-            ListView1.Visibility = Visibility.Hidden;
-            TextBox2.Visibility = Visibility.Hidden;
+            ListViewMessage.Visibility = Visibility.Hidden;
+            TextBoxMessage.Visibility = Visibility.Hidden;
         }
         void DisconnectUser()
         {
@@ -51,12 +51,12 @@ namespace ChatClient
                 }
             }
             client = null;
-            Label1.Content = "Состояние: Стандартное";
+            LabelState.Content = "Состояние: Стандартное";
             Button1.Content = "Найти собеседника";
-            ListView1.Visibility = Visibility.Hidden;
-            TextBox2.Visibility = Visibility.Hidden;
+            ListViewMessage.Visibility = Visibility.Hidden;
+            TextBoxMessage.Visibility = Visibility.Hidden;
             state = State.NoSearch;
-            ListView1.Items.Clear();
+            ListViewMessage.Items.Clear();
         }
 
         private void Find()
@@ -65,16 +65,16 @@ namespace ChatClient
             (ID, ID1) = client.Connect();
             if (ID1 != -1)
             {
-                Label1.Content = "Состояние: Ваш собеседник найден";
+                LabelState.Content = "Состояние: Ваш собеседник найден";
                 Button1.Content = "Отключиться";
-                ListView1.Visibility = Visibility.Visible;
-                TextBox2.Visibility = Visibility.Visible;
+                ListViewMessage.Visibility = Visibility.Visible;
+                TextBoxMessage.Visibility = Visibility.Visible;
                 state = State.Found;
-                TextBox2.IsEnabled = true;
+                TextBoxMessage.IsEnabled = true;
             }
             else
             {
-                Label1.Content = "Состояние: Поиск собеседника";
+                LabelState.Content = "Состояние: Поиск собеседника";
                 Button1.Content = "Отменить поиск";
                 state = State.Search;
             }
@@ -91,8 +91,8 @@ namespace ChatClient
                 string decryptedString = ASCIIEncoding.UTF8.GetString(decryptedBytes);
                 text += decryptedString;
             }
-            ListView1.Items.Add(text);
-            ListView1.ScrollIntoView(ListView1.Items[ListView1.Items.Count - 1]);
+            ListViewMessage.Items.Add(text);
+            ListViewMessage.ScrollIntoView(ListViewMessage.Items[ListViewMessage.Items.Count - 1]);
         }
 
 
@@ -110,19 +110,19 @@ namespace ChatClient
         {
             this.ID = ID;
             this.ID1 = ID1;
-            Label1.Content = "Состояние: Ваш собеседник найден";
+            LabelState.Content = "Состояние: Ваш собеседник найден";
             Button1.Content = "Отключиться";
-            TextBox2.IsEnabled = true;
-            ListView1.Visibility = Visibility.Visible;
-            TextBox2.Visibility = Visibility.Visible;
+            TextBoxMessage.IsEnabled = true;
+            ListViewMessage.Visibility = Visibility.Visible;
+            TextBoxMessage.Visibility = Visibility.Visible;
             state = State.Found;
         }
 
         public void LeftChat()
         {
-            Label1.Content = "Состояние: Чат без собеседника";
-            TextBox2.IsEnabled = false;
-            TextBox2.Clear();
+            LabelState.Content = "Состояние: Чат без собеседника";
+            TextBoxMessage.IsEnabled = false;
+            TextBoxMessage.Clear();
             ID1 = -1;
         }
 
@@ -178,7 +178,7 @@ namespace ChatClient
         private void CancelSearch()
         {
             client.RemoveUser(ID);
-            Label1.Content = "Состояние: Стандартное";
+            LabelState.Content = "Состояние: Стандартное";
             Button1.Content = "Найти собеседника";
             state = State.NoSearch;
         }
@@ -190,7 +190,7 @@ namespace ChatClient
         }
 
 
-        private void TextBox2_KeyDown(object sender, KeyEventArgs e)
+        private void TextBoxMessage_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter)
             {
@@ -198,11 +198,11 @@ namespace ChatClient
                 {
                     byte[] key = ASCIIEncoding.UTF8.GetBytes("Ключ");
                     RC4 encoder = new RC4(key);
-                    string testString = TextBox2.Text;
+                    string testString = TextBoxMessage.Text;
                     byte[] testBytes = ASCIIEncoding.UTF8.GetBytes(testString);
                     byte[] result = encoder.Encode(testBytes, testBytes.Length);
                     client.SendMessage(result, ID, ID1);
-                    TextBox2.Text = string.Empty;
+                    TextBoxMessage.Text = string.Empty;
                 }
             }
         }
