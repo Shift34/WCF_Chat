@@ -63,6 +63,11 @@
       <DependentUpon>Reference.svcmap</DependentUpon>
     </Compile>
     <Compile Include="MVVM\Model\MessageModel.cs" />
+    <Compile Include="Protocol Signal\GostCurve.cs" />
+    <Compile Include="Protocol Signal\HMAC.cs" />
+    <Compile Include="Protocol Signal\Kuznechik.cs" />
+    <Compile Include="Protocol Signal\Program.cs" />
+    <Compile Include="Protocol Signal\Streebog.cs" />
     <Compile Include="RC4.cs" />
     <Compile Include="MVVM\ViewModel\MainViewModel.cs" />
     <Page Include="MainWindow.xaml">
@@ -146,5 +151,6 @@
       <LastGenOutput>Reference.cs</LastGenOutput>
     </None>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
