@@ -15,6 +15,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using ChatClient.ServiceChat;
+using ChatClient.ProtocolSignal;
+using System.Security.Cryptography;
 namespace ChatClient
 {
     /// <summary>
@@ -31,6 +33,8 @@ namespace ChatClient
         {
             InitializeComponent();
             state = State.NoSearch;
+            ECDiffieHellman alice = ECDiffieHellman.Create(GostCurve.GetGost3410Curve());
+            client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));
             ListViewMessage.Visibility = Visibility.Hidden;
             TextBoxMessage.Visibility = Visibility.Hidden;
         }
@@ -61,7 +65,6 @@ namespace ChatClient
 
         private void Find()
         {
-            client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));
             (ID, ID1) = client.Connect();
             if (ID1 != -1)
             {
@@ -107,6 +110,18 @@ namespace ChatClient
         }
 
         public void FoundByIp(int ID, int ID1)
+        {
+            this.ID = ID;
+            this.ID1 = ID1;
+            LabelState.Content = "Состояние: Ваш собеседник найден";
+            Button1.Content = "Отключиться";
+            TextBoxMessage.IsEnabled = true;
+            ListViewMessage.Visibility = Visibility.Visible;
+            TextBoxMessage.Visibility = Visibility.Visible;
+            state = State.Found;
+        }
+
+        public void GetIP(int ID, int ID1)
         {
             this.ID = ID;
             this.ID1 = ID1;

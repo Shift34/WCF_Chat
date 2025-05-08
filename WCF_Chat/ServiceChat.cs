@@ -12,48 +12,67 @@ namespace WCF_Chat
     [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
     public class ServiceChat : IServiceChat
     {
-        List<ServerUser> users = new List<ServerUser>();
-        int nextId = 0;
+        private readonly object _lock = new object();
+        Dictionary<int, ServerUser> usersSearch;
+        Dictionary<int, ServerUser> usersFound;
+        Dictionary<int, ServerUser> usersNoSearch;
+        Queue<ServerUser> queue;
+        int nextId;
 
-        public (int , int) Connect()
+        public ServiceChat() 
         {
-            ServerUser user = new ServerUser()
+            usersSearch = new Dictionary<int, ServerUser>();
+            usersFound = new Dictionary<int, ServerUser>();
+            usersNoSearch = new Dictionary<int, ServerUser>();
+            queue = new Queue<ServerUser>();
+            nextId = 0;
+        }
+        public void CreateUser()
+        {
+            lock (_lock)
             {
-                ID = nextId,
-                OperationContext = OperationContext.Current,
-                State = State.Search
-            };
-            users.Add(user);
-            foreach (var item in users)
-            {
-                if (item.State == State.Search && item.ID != nextId)
-                {
-                    item.State = State.Found;
-                    user.State = State.Found;
-                    item.OperationContext.GetCallbackChannel<IServerChatCallback>().FoundByIp(item.ID, user.ID);
-                    nextId++;
-                    return (user.ID, item.ID);
-                }
+                ServerUser user = new ServerUser(nextId++);
+                usersNoSearch.Add(user.ID, user);
             }
-            nextId++;
-            return (user.ID, -1);
+        }
+
+        public bool Connect(int myID)
+        {
+            lock (_lock)
+            {
+                ServerUser user = usersNoSearch[myID];
+                usersNoSearch.Remove(myID);
+                usersSearch.Add(myID, user);
+
+                if (queue.Count > 0)
+                {
+                    ServerUser user1 =  queue.Dequeue();
+                    user.OperationContext.GetCallbackChannel<IServerChatCallback>().GetIP(user1.ID, user.ID);
+                    user1.OperationContext.GetCallbackChannel<IServerChatCallback>().GetIP(user.ID, user1.ID);
+                    return true;
+                }
+
+                user.OperationContext.GetCallbackChannel<IServerChatCallback>().GetIP(user.ID, -1);
+                return false;
+            }
         }
         public void Disconnect(int identificator, int indetificator1)
         {
-            var user = users.FirstOrDefault(i => i.ID == identificator); //поиск usera
+
+            var user = usersFound[identificator]; //поиск usera
             if (user != null)
             {
                 SendMessageExit(": " + "покинул чат", identificator, indetificator1);
-                users.Remove(user);
+                usersFound.Remove(identificator);
+                usersNoSearch.Add(user.ID, user);
             }
         }
 
         public void RemoveUser(int identificator)
         {
-            var user = users.FirstOrDefault(i => i.ID == identificator);
-            if (user != null)
+            if (!usersFound.Remove(identificator) && !usersNoSearch.Remove(identificator) && !usersSearch.Remove(identificator))
             {
-                users.Remove(user);
+                throw new Exception("Нельзя удалить не существующего пользователя");
             }
         }
 
@@ -61,10 +80,10 @@ namespace WCF_Chat
         {
             string answer = DateTime.Now.ToShortTimeString();
             string answer1 = answer + ": " + "Я" + ":  ";
-            var user = users.FirstOrDefault(i => i.ID == identificator);
+            var user = usersFound[identificator];
             user.OperationContext.GetCallbackChannel<IServerChatCallback>().MessageCallBack(answer1, message);
             string answer2 = answer + ": " + "Собеседник" + ":  ";
-            var user1 = users.FirstOrDefault(i => i.ID == identificator1);
+            var user1 = usersFound[identificator1];
             user1.OperationContext.GetCallbackChannel<IServerChatCallback>().MessageCallBack(answer2, message);
         }
 
@@ -73,7 +92,7 @@ namespace WCF_Chat
             string answer = DateTime.Now.ToShortTimeString();
             answer += ": " + "Собеседник";
             answer += message;
-            var user1 = users.FirstOrDefault(i => i.ID == identificator1);
+            var user1 = usersFound[identificator1];
             user1.OperationContext.GetCallbackChannel<IServerChatCallback>().MessageCallBack(answer, null);
             user1.OperationContext.GetCallbackChannel<IServerChatCallback>().LeftChat();
         }

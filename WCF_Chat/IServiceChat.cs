@@ -11,7 +11,7 @@ namespace WCF_Chat
     public interface IServiceChat
     {
         [OperationContract]
-        (int ID , int ID1) Connect();
+        bool Connect(int myID);
 
         [OperationContract]
         void Disconnect(int identificator, int indetificator1);
@@ -30,7 +30,7 @@ namespace WCF_Chat
         [OperationContract(IsOneWay = true)]
         void MessageCallBack(string message, byte[] bytes);
         [OperationContract(IsOneWay = true)]
-        void FoundByIp(int ID,int ID1);
+        void GetIP(int ID,int ID1);
         [OperationContract(IsOneWay = true)]
         void LeftChat();
     }
