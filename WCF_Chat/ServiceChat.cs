@@ -9,7 +9,7 @@ using System.Threading;
 
 namespace WCF_Chat
 {
-    [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
+    [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single, ConcurrencyMode = ConcurrencyMode.Reentrant)]
     public class ServiceChat : IServiceChat
     {
         private readonly object _lock = new object();
@@ -27,50 +27,64 @@ namespace WCF_Chat
             queue = new Queue<ServerUser>();
             nextId = 0;
         }
-        public void CreateUser()
+        public int CreateUser()
         {
-            lock (_lock)
-            {
-                ServerUser user = new ServerUser(nextId++);
+
+                ServerUser user = new ServerUser()
+                {
+                    ID = nextId++,
+                    Callback = OperationContext.Current.GetCallbackChannel<IServerChatCallback>(),
+                    State = State.Search
+                };
                 usersNoSearch.Add(user.ID, user);
-            }
+                return user.ID;
+
         }
 
         public bool Connect(int myID)
         {
-            lock (_lock)
-            {
+
                 ServerUser user = usersNoSearch[myID];
                 usersNoSearch.Remove(myID);
                 usersSearch.Add(myID, user);
 
+
                 if (queue.Count > 0)
                 {
                     ServerUser user1 =  queue.Dequeue();
-                    user.OperationContext.GetCallbackChannel<IServerChatCallback>().GetIP(user1.ID, user.ID);
-                    user1.OperationContext.GetCallbackChannel<IServerChatCallback>().GetIP(user.ID, user1.ID);
-                    return true;
+                user.Callback.GetIP(user.ID, user1.ID);
+                if (user1 != null)
+                {
+                    user1.Callback.GetIP(user1.ID, user.ID);
+                }
+                return true;
                 }
 
-                user.OperationContext.GetCallbackChannel<IServerChatCallback>().GetIP(user.ID, -1);
+                queue.Enqueue(user);
+                user.Callback.GetIP(user.ID, -1); // Safe call
                 return false;
-            }
+
         }
         public void Disconnect(int identificator, int indetificator1)
         {
-
-            var user = usersFound[identificator]; //поиск usera
+            var user = usersFound[identificator];//поиск usera
+            var user1 = usersFound[indetificator1];
             if (user != null)
             {
                 SendMessageExit(": " + "покинул чат", identificator, indetificator1);
                 usersFound.Remove(identificator);
                 usersNoSearch.Add(user.ID, user);
+                if(user1 != null)
+                {
+                    usersFound.Remove(indetificator1);
+                    usersNoSearch.Add(user1.ID, user1);
+                }
             }
         }
 
-        public void RemoveUser(int identificator)
+        public void RemoveUserSearch(int identificator)
         {
-            if (!usersFound.Remove(identificator) && !usersNoSearch.Remove(identificator) && !usersSearch.Remove(identificator))
+            if (!usersSearch.Remove(identificator))
             {
                 throw new Exception("Нельзя удалить не существующего пользователя");
             }
@@ -81,10 +95,10 @@ namespace WCF_Chat
             string answer = DateTime.Now.ToShortTimeString();
             string answer1 = answer + ": " + "Я" + ":  ";
             var user = usersFound[identificator];
-            user.OperationContext.GetCallbackChannel<IServerChatCallback>().MessageCallBack(answer1, message);
+            user.Callback.MessageCallBack(answer1, message);
             string answer2 = answer + ": " + "Собеседник" + ":  ";
             var user1 = usersFound[identificator1];
-            user1.OperationContext.GetCallbackChannel<IServerChatCallback>().MessageCallBack(answer2, message);
+            user1.Callback.MessageCallBack(answer2, message);
         }
 
         public void SendMessageExit(string message, int identificator, int identificator1)
@@ -93,8 +107,8 @@ namespace WCF_Chat
             answer += ": " + "Собеседник";
             answer += message;
             var user1 = usersFound[identificator1];
-            user1.OperationContext.GetCallbackChannel<IServerChatCallback>().MessageCallBack(answer, null);
-            user1.OperationContext.GetCallbackChannel<IServerChatCallback>().LeftChat();
+            user1.Callback.MessageCallBack(answer, null);
+            user1.Callback.LeftChat();
         }
     }
 }

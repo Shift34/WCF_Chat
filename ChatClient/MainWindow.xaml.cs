@@ -25,48 +25,32 @@ namespace ChatClient
     [CallbackBehavior(ConcurrencyMode = ConcurrencyMode.Multiple)]
     public partial class MainWindow : Window, IServiceChatCallback
     {
-        ServiceChat.ServiceChatClient client;
-        State state {get; set;}
-        int ID = -1;
-        int ID1 = -1;
+        private ServiceChat.ServiceChatClient client;
+        private State state {get; set;}
+        private int ID = -1;
+        private int ID1 = 0;
+
+        private enum State
+        {
+            Search,
+            Found,
+            NoSearch
+        }
         public MainWindow()
         {
             InitializeComponent();
-            state = State.NoSearch;
             ECDiffieHellman alice = ECDiffieHellman.Create(GostCurve.GetGost3410Curve());
-            client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));
-            ListViewMessage.Visibility = Visibility.Hidden;
-            TextBoxMessage.Visibility = Visibility.Hidden;
-        }
-        void DisconnectUser()
-        {
-            if (ID1 != -1)
-            {
-                client.Disconnect(ID, ID1);
-                ID = -1;
-                ID1 = -1;
-            }
-            else
-            {
-                ID = -1;
-                if (client != null)
-                {
-                    client.RemoveUser(ID);
-                }
-            }
-            client = null;
-            LabelState.Content = "Состояние: Стандартное";
-            Button1.Content = "Найти собеседника";
-            ListViewMessage.Visibility = Visibility.Hidden;
-            TextBoxMessage.Visibility = Visibility.Hidden;
-            state = State.NoSearch;
-            ListViewMessage.Items.Clear();
-        }
 
+            state = State.NoSearch;
+            ListViewMessage.Visibility = Visibility.Hidden;
+            TextBoxMessage.Visibility = Visibility.Hidden;
+        }
         private void Find()
         {
-            (ID, ID1) = client.Connect();
-            if (ID1 != -1)
+            client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));
+            ID = client.CreateUser();
+            bool find = client.Connect(ID);
+            if (find)
             {
                 LabelState.Content = "Состояние: Ваш собеседник найден";
                 Button1.Content = "Отключиться";
@@ -83,6 +67,24 @@ namespace ChatClient
             }
         }
 
+        private void DisconnectUser()
+        {
+            if (ID1 != -1)
+            {
+                client.Disconnect(ID, ID1);
+                ID1 = -1;
+            }
+            else
+            {
+                client.Disconnect(ID, -1);
+            }
+            LabelState.Content = "Состояние: Стандартное";
+            Button1.Content = "Найти собеседника";
+            ListViewMessage.Visibility = Visibility.Hidden;
+            TextBoxMessage.Visibility = Visibility.Hidden;
+            state = State.NoSearch;
+            ListViewMessage.Items.Clear();
+        }
         public void MessageCallBack(string message, byte[] bytes = null)
         {
             string text = message;
@@ -107,18 +109,6 @@ namespace ChatClient
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             DisconnectUser();
-        }
-
-        public void FoundByIp(int ID, int ID1)
-        {
-            this.ID = ID;
-            this.ID1 = ID1;
-            LabelState.Content = "Состояние: Ваш собеседник найден";
-            Button1.Content = "Отключиться";
-            TextBoxMessage.IsEnabled = true;
-            ListViewMessage.Visibility = Visibility.Visible;
-            TextBoxMessage.Visibility = Visibility.Visible;
-            state = State.Found;
         }
 
         public void GetIP(int ID, int ID1)
@@ -192,16 +182,10 @@ namespace ChatClient
         }
         private void CancelSearch()
         {
-            client.RemoveUser(ID);
+            client.RemoveUserSearch(ID);
             LabelState.Content = "Состояние: Стандартное";
             Button1.Content = "Найти собеседника";
             state = State.NoSearch;
-        }
-        public enum State
-        {
-            Search,
-            Found,
-            NoSearch
         }
 
 

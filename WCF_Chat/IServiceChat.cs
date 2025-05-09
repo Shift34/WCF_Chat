@@ -11,12 +11,15 @@ namespace WCF_Chat
     public interface IServiceChat
     {
         [OperationContract]
+        int CreateUser();
+
+        [OperationContract]
         bool Connect(int myID);
 
         [OperationContract]
         void Disconnect(int identificator, int indetificator1);
         [OperationContract]
-        void RemoveUser(int identificator);
+        void RemoveUserSearch(int identificator);
 
         [OperationContract(IsOneWay = true)]
         void SendMessage(byte[] bytes, int identificator, int identificator1);

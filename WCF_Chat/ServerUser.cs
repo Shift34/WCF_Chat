@@ -13,14 +13,8 @@ namespace WCF_Chat
 
         public State State {get;set;}
 
-        public OperationContext OperationContext { get; set; }
+        public IServerChatCallback Callback { get; set; }
 
-        public ServerUser(int id)
-        {
-            ID = id;
-            OperationContext = OperationContext.Current;
-            State = State.Search;
-        }
     }
     public enum State
     {
