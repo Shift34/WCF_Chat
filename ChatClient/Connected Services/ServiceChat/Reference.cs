@@ -16,10 +16,10 @@ namespace ChatClient.ServiceChat {
     public interface IServiceChat {
         
         [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/CreateUser", ReplyAction="http://tempuri.org/IServiceChat/CreateUserResponse")]
-        int CreateUser(System.Security.Cryptography.ECDiffieHellmanPublicKey publicKey);
+        int CreateUser(byte[] publicKey);
         
         [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/CreateUser", ReplyAction="http://tempuri.org/IServiceChat/CreateUserResponse")]
-        System.Threading.Tasks.Task<int> CreateUserAsync(System.Security.Cryptography.ECDiffieHellmanPublicKey publicKey);
+        System.Threading.Tasks.Task<int> CreateUserAsync(byte[] publicKey);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/Connect")]
         void Connect(int myID);
@@ -51,16 +51,16 @@ namespace ChatClient.ServiceChat {
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendMessageExit")]
         System.Threading.Tasks.Task SendMessageExitAsync(string message, int identificator1);
         
-        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/SendHashProtocol", ReplyAction="http://tempuri.org/IServiceChat/SendHashProtocolResponse")]
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendHashProtocol")]
         void SendHashProtocol(byte[] key, byte[] hmac, int id);
         
-        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/SendHashProtocol", ReplyAction="http://tempuri.org/IServiceChat/SendHashProtocolResponse")]
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendHashProtocol")]
         System.Threading.Tasks.Task SendHashProtocolAsync(byte[] key, byte[] hmac, int id);
         
-        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/SendHashEquals", ReplyAction="http://tempuri.org/IServiceChat/SendHashEqualsResponse")]
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendHashEquals")]
         void SendHashEquals(bool state, int id);
         
-        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/SendHashEquals", ReplyAction="http://tempuri.org/IServiceChat/SendHashEqualsResponse")]
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendHashEquals")]
         System.Threading.Tasks.Task SendHashEqualsAsync(bool state, int id);
     }
     
@@ -71,7 +71,7 @@ namespace ChatClient.ServiceChat {
         void MessageCallBack(string message, byte[] bytes);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/GetConnectionAndPublicKey")]
-        void GetConnectionAndPublicKey(System.Security.Cryptography.ECDiffieHellmanPublicKey publickey);
+        void GetConnectionAndPublicKey(byte[] publickey);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/LeftChat")]
         void LeftChat();
@@ -111,11 +111,11 @@ namespace ChatClient.ServiceChat {
                 base(callbackInstance, binding, remoteAddress) {
         }
         
-        public int CreateUser(System.Security.Cryptography.ECDiffieHellmanPublicKey publicKey) {
+        public int CreateUser(byte[] publicKey) {
             return base.Channel.CreateUser(publicKey);
         }
         
-        public System.Threading.Tasks.Task<int> CreateUserAsync(System.Security.Cryptography.ECDiffieHellmanPublicKey publicKey) {
+        public System.Threading.Tasks.Task<int> CreateUserAsync(byte[] publicKey) {
             return base.Channel.CreateUserAsync(publicKey);
         }
         

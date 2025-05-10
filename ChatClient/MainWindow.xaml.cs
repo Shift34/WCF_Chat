@@ -18,6 +18,7 @@ using ChatClient.ServiceChat;
 using ChatClient.ProtocolSignal;
 using System.Security.Cryptography;
 using System.Security.Policy;
+using System.ServiceModel.Channels;
 namespace ChatClient
 {
     /// <summary>
@@ -29,6 +30,9 @@ namespace ChatClient
         private ServiceChat.ServiceChatClient client;
         private ECDiffieHellman alice;
         private byte[] aliceSharedSecret;
+        private byte[] aesKey;
+        private byte[] hmacKey;
+        private Kuznechik kuznechik;
         private State state {get; set;}
         private int ID = -1;
 
@@ -43,8 +47,9 @@ namespace ChatClient
         {
             InitializeComponent();
             alice = ECDiffieHellman.Create(GostCurve.GetGost3410Curve());
-            client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));
-            ID = client.CreateUser(alice.PublicKey);
+            byte[] publicKey = alice.PublicKey.ToByteArray();
+            client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));           
+            ID = client.CreateUser(publicKey);
             state = State.NoSearch;
             ListViewMessage.Visibility = Visibility.Hidden;
             TextBoxMessage.Visibility = Visibility.Hidden;
@@ -72,20 +77,6 @@ namespace ChatClient
             state = State.NoSearch;
             ListViewMessage.Items.Clear();
         }
-        public void MessageCallBack(string message, byte[] bytes = null)
-        {
-            string text = message;
-            if (bytes != null)
-            {
-                byte[] key = ASCIIEncoding.UTF8.GetBytes("Ключ");
-                RC4 decoder = new RC4(key);
-                byte[] decryptedBytes = decoder.Decode(bytes, bytes.Length);
-                string decryptedString = ASCIIEncoding.UTF8.GetString(decryptedBytes);
-                text += decryptedString;
-            }
-            ListViewMessage.Items.Add(text);
-            ListViewMessage.ScrollIntoView(ListViewMessage.Items[ListViewMessage.Items.Count - 1]);
-        }
 
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -98,18 +89,17 @@ namespace ChatClient
             DisconnectUser();
         }
 
-        public void GetConnectionAndPublicKey(ECDiffieHellmanPublicKey publickey)
+        public void GetConnectionAndPublicKey(byte[] publickey)
         {
             if (publickey != null)
             {
                 state = State.Found;
+                aliceSharedSecret = SignalProtocolExample.GenerateSharedSecret(ECDiffieHellmanCngPublicKey.FromByteArray(publickey, CngKeyBlobFormat.EccFullPublicBlob), alice);
             }
             else
             {
                 state = State.Search;
             }
-
-            aliceSharedSecret = SignalProtocolExample.GenerateSharedSecret(publickey, alice);
 
             if (state == State.Found)
             {
@@ -119,6 +109,7 @@ namespace ChatClient
             {
                 LabelState.Content = "Состояние: Поиск собеседника";
                 Button1.Content = "Отменить поиск";
+
                 state = State.Search;
             }
         }
@@ -143,14 +134,19 @@ namespace ChatClient
                 Button1.Content = "Отключиться";
                 ListViewMessage.Visibility = Visibility.Visible;
                 TextBoxMessage.Visibility = Visibility.Visible;
-                state = State.Found;
                 TextBoxMessage.IsEnabled = true;
+
+                state = State.Found;
+
+                SignalProtocolExample.DeriveKeys(aliceSharedSecret, out aesKey, out hmacKey);
+                kuznechik = new Kuznechik();
             }
         }
 
         public void CompareHMAC(byte[] key, byte[] hmac)
         {
-            if(SignalProtocolExample.ComputeHmac(key, aliceSharedSecret) == hmac)
+            byte[] test = SignalProtocolExample.ComputeHmac(key, aliceSharedSecret);
+            if (test.SequenceEqual(hmac))
             {
                 client.SendHashEquals(true, ID);
             }
@@ -161,6 +157,7 @@ namespace ChatClient
             LabelState.Content = "Состояние: Чат без собеседника";
             TextBoxMessage.IsEnabled = false;
             TextBoxMessage.Clear();
+
             state = State.FoundNoClient;
         }
 
@@ -216,8 +213,10 @@ namespace ChatClient
         private void CancelSearch()
         {
             client.RemoveUserSearch(ID);
+
             LabelState.Content = "Состояние: Стандартное";
             Button1.Content = "Найти собеседника";
+
             state = State.NoSearch;
         }
 
@@ -228,17 +227,26 @@ namespace ChatClient
             {
                 if (client != null)
                 {
-                    byte[] key = ASCIIEncoding.UTF8.GetBytes("Ключ");
-                    RC4 encoder = new RC4(key);
                     string testString = TextBoxMessage.Text;
-                    byte[] testBytes = ASCIIEncoding.UTF8.GetBytes(testString);
-                    byte[] result = encoder.Encode(testBytes, testBytes.Length);
-                    client.SendMessage(result, ID);
+                    byte[] encryptedMessage = kuznechik.KuzEncript(Encoding.UTF8.GetBytes(testString), aesKey);
+
+                    client.SendMessage(encryptedMessage, ID);
                     TextBoxMessage.Text = string.Empty;
                 }
             }
         }
-
+        public void MessageCallBack(string message, byte[] bytes = null)
+        {
+            string text = message;
+            if (bytes != null)
+            {
+                byte[] decryptedMessage = kuznechik.KuzDecript(bytes, aesKey);
+                string decryptedText = Encoding.UTF8.GetString(decryptedMessage);
+                text += decryptedText;
+            }
+            ListViewMessage.Items.Add(text);
+            ListViewMessage.ScrollIntoView(ListViewMessage.Items[ListViewMessage.Items.Count - 1]);
+        }
 
     }
 }

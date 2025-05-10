@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <xs:schema xmlns:tns="http://tempuri.org/" elementFormDefault="qualified" targetNamespace="http://tempuri.org/" xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:import schemaLocation="http://localhost:745/?xsd=xsd2" namespace="http://schemas.datacontract.org/2004/07/System.Security.Cryptography" />
   <xs:element name="CreateUser">
     <xs:complexType>
       <xs:sequence>
-        <xs:element xmlns:q1="http://schemas.datacontract.org/2004/07/System.Security.Cryptography" minOccurs="0" name="publicKey" nillable="true" type="q1:ECDiffieHellmanPublicKey" />
+        <xs:element minOccurs="0" name="publicKey" nillable="true" type="xs:base64Binary" />
       </xs:sequence>
     </xs:complexType>
   </xs:element>
@@ -71,22 +70,12 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-  <xs:element name="SendHashProtocolResponse">
-    <xs:complexType>
-      <xs:sequence />
-    </xs:complexType>
-  </xs:element>
   <xs:element name="SendHashEquals">
     <xs:complexType>
       <xs:sequence>
         <xs:element minOccurs="0" name="state" type="xs:boolean" />
         <xs:element minOccurs="0" name="id" type="xs:int" />
       </xs:sequence>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="SendHashEqualsResponse">
-    <xs:complexType>
-      <xs:sequence />
     </xs:complexType>
   </xs:element>
   <xs:element name="MessageCallBack">
@@ -100,7 +89,7 @@
   <xs:element name="GetConnectionAndPublicKey">
     <xs:complexType>
       <xs:sequence>
-        <xs:element xmlns:q2="http://schemas.datacontract.org/2004/07/System.Security.Cryptography" minOccurs="0" name="publickey" nillable="true" type="q2:ECDiffieHellmanPublicKey" />
+        <xs:element minOccurs="0" name="publickey" nillable="true" type="xs:base64Binary" />
       </xs:sequence>
     </xs:complexType>
   </xs:element>

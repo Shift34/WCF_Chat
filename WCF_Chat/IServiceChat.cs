@@ -12,7 +12,7 @@ namespace WCF_Chat
     public interface IServiceChat
     {
         [OperationContract]
-        int CreateUser(ECDiffieHellmanPublicKey publicKey);
+        int CreateUser(byte[] publicKey);
 
         [OperationContract(IsOneWay = true)]
         void Connect(int myID);
@@ -27,10 +27,10 @@ namespace WCF_Chat
         [OperationContract(IsOneWay = true)]
         void SendMessageExit(string message, int identificator1);
 
-        [OperationContract]
+        [OperationContract(IsOneWay = true)]
         void SendHashProtocol(byte[] key, byte[] hmac, int id);
 
-        [OperationContract]
+        [OperationContract(IsOneWay = true)]
         void SendHashEquals(bool state, int id);
     }
 
@@ -39,7 +39,7 @@ namespace WCF_Chat
         [OperationContract(IsOneWay = true)]
         void MessageCallBack(string message, byte[] bytes);
         [OperationContract(IsOneWay = true)]
-        void GetConnectionAndPublicKey(ECDiffieHellmanPublicKey publickey);
+        void GetConnectionAndPublicKey(byte[] publickey);
         [OperationContract(IsOneWay = true)]
         void LeftChat();
 

@@ -13,7 +13,7 @@ namespace WCF_Chat
         public int ID { get; set; }
         public int ID1 { get; set; }
 
-        public ECDiffieHellmanPublicKey PublicKey { get; set; }
+        public byte[] PublicKey { get; set; }
 
         public IServerChatCallback Callback { get; set; }
 

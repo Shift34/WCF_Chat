@@ -11,6 +11,7 @@ using System.Security.Cryptography;
 namespace WCF_Chat
 {
     [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single, ConcurrencyMode = ConcurrencyMode.Reentrant)]
+    [KnownType(typeof(ECDiffieHellmanPublicKey))]
     public class ServiceChat : IServiceChat
     {
         private readonly object _lock = new object();
@@ -28,7 +29,7 @@ namespace WCF_Chat
             queue = new Queue<ServerUser>();
             nextId = 0;
         }
-        public int CreateUser(ECDiffieHellmanPublicKey publicKey)
+        public int CreateUser(byte[] publicKey)
         {
             ServerUser user = new ServerUser()
             {
@@ -66,13 +67,14 @@ namespace WCF_Chat
         }
         public void Disconnect(int identificator)
         {
-
             var user = usersFound[identificator];//поиск usera
             if (user != null)
             {
                 if (user.ID1 != -1)
                 {
                     SendMessageExit(": " + "покинул чат", user.ID1);
+                    usersFound[user.ID1].ID1 = -1;
+                    user.ID1 = -1;
                 }
                 usersFound.Remove(identificator);
                 usersNoSearch.Add(user.ID, user);
@@ -127,6 +129,7 @@ namespace WCF_Chat
         public void SendHashEquals(bool state, int id)
         {
             ServerUser user = usersFound[id];
+            usersFound[user.ID].Callback.GetConnectionProtocol(state);
             usersFound[user.ID1].Callback.GetConnectionProtocol(state);
         }
     }
