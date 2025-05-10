@@ -33,6 +33,7 @@
     <xsd:schema targetNamespace="http://tempuri.org/Imports">
       <xsd:import schemaLocation="http://localhost:745/?xsd=xsd0" namespace="http://tempuri.org/" />
       <xsd:import schemaLocation="http://localhost:745/?xsd=xsd1" namespace="http://schemas.microsoft.com/2003/10/Serialization/" />
+      <xsd:import schemaLocation="http://localhost:745/?xsd=xsd2" namespace="http://schemas.datacontract.org/2004/07/System.Security.Cryptography" />
     </xsd:schema>
   </wsdl:types>
   <wsdl:message name="IServiceChat_CreateUser_InputMessage">
@@ -62,14 +63,32 @@
   <wsdl:message name="IServiceChat_SendMessageExit_InputMessage">
     <wsdl:part name="parameters" element="tns:SendMessageExit" />
   </wsdl:message>
+  <wsdl:message name="IServiceChat_SendHashProtocol_InputMessage">
+    <wsdl:part name="parameters" element="tns:SendHashProtocol" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_SendHashProtocol_OutputMessage">
+    <wsdl:part name="parameters" element="tns:SendHashProtocolResponse" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_SendHashEquals_InputMessage">
+    <wsdl:part name="parameters" element="tns:SendHashEquals" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_SendHashEquals_OutputMessage">
+    <wsdl:part name="parameters" element="tns:SendHashEqualsResponse" />
+  </wsdl:message>
   <wsdl:message name="IServiceChat_MessageCallBack_OutputCallbackMessage">
     <wsdl:part name="parameters" element="tns:MessageCallBack" />
   </wsdl:message>
-  <wsdl:message name="IServiceChat_GetIP_OutputCallbackMessage">
-    <wsdl:part name="parameters" element="tns:GetIP" />
+  <wsdl:message name="IServiceChat_GetConnectionAndPublicKey_OutputCallbackMessage">
+    <wsdl:part name="parameters" element="tns:GetConnectionAndPublicKey" />
   </wsdl:message>
   <wsdl:message name="IServiceChat_LeftChat_OutputCallbackMessage">
     <wsdl:part name="parameters" element="tns:LeftChat" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_CompareHMAC_OutputCallbackMessage">
+    <wsdl:part name="parameters" element="tns:CompareHMAC" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_GetConnectionProtocol_OutputCallbackMessage">
+    <wsdl:part name="parameters" element="tns:GetConnectionProtocol" />
   </wsdl:message>
   <wsdl:portType name="IServiceChat">
     <wsdl:operation name="CreateUser">
@@ -93,14 +112,28 @@
     <wsdl:operation name="SendMessageExit">
       <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendMessageExit" message="tns:IServiceChat_SendMessageExit_InputMessage" />
     </wsdl:operation>
+    <wsdl:operation name="SendHashProtocol">
+      <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendHashProtocol" message="tns:IServiceChat_SendHashProtocol_InputMessage" />
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/SendHashProtocolResponse" message="tns:IServiceChat_SendHashProtocol_OutputMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="SendHashEquals">
+      <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendHashEquals" message="tns:IServiceChat_SendHashEquals_InputMessage" />
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/SendHashEqualsResponse" message="tns:IServiceChat_SendHashEquals_OutputMessage" />
+    </wsdl:operation>
     <wsdl:operation name="MessageCallBack">
       <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/MessageCallBack" message="tns:IServiceChat_MessageCallBack_OutputCallbackMessage" />
     </wsdl:operation>
-    <wsdl:operation name="GetIP">
-      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/GetIP" message="tns:IServiceChat_GetIP_OutputCallbackMessage" />
+    <wsdl:operation name="GetConnectionAndPublicKey">
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/GetConnectionAndPublicKey" message="tns:IServiceChat_GetConnectionAndPublicKey_OutputCallbackMessage" />
     </wsdl:operation>
     <wsdl:operation name="LeftChat">
       <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/LeftChat" message="tns:IServiceChat_LeftChat_OutputCallbackMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="CompareHMAC">
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/CompareHMAC" message="tns:IServiceChat_CompareHMAC_OutputCallbackMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="GetConnectionProtocol">
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/GetConnectionProtocol" message="tns:IServiceChat_GetConnectionProtocol_OutputCallbackMessage" />
     </wsdl:operation>
   </wsdl:portType>
   <wsdl:binding name="NetTcpBinding_IServiceChat" type="tns:IServiceChat">
@@ -151,20 +184,50 @@
         <soap12:body use="literal" />
       </wsdl:input>
     </wsdl:operation>
+    <wsdl:operation name="SendHashProtocol">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/SendHashProtocol" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="SendHashEquals">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/SendHashEquals" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
     <wsdl:operation name="MessageCallBack">
       <soap12:operation soapAction="http://tempuri.org/IServiceChat/MessageCallBack" style="document" />
       <wsdl:output>
         <soap12:body use="literal" />
       </wsdl:output>
     </wsdl:operation>
-    <wsdl:operation name="GetIP">
-      <soap12:operation soapAction="http://tempuri.org/IServiceChat/GetIP" style="document" />
+    <wsdl:operation name="GetConnectionAndPublicKey">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/GetConnectionAndPublicKey" style="document" />
       <wsdl:output>
         <soap12:body use="literal" />
       </wsdl:output>
     </wsdl:operation>
     <wsdl:operation name="LeftChat">
       <soap12:operation soapAction="http://tempuri.org/IServiceChat/LeftChat" style="document" />
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="CompareHMAC">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/CompareHMAC" style="document" />
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetConnectionProtocol">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/GetConnectionProtocol" style="document" />
       <wsdl:output>
         <soap12:body use="literal" />
       </wsdl:output>

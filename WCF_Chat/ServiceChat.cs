@@ -6,6 +6,7 @@ using System.ServiceModel;
 using System.ServiceModel.Channels;
 using System.Text;
 using System.Threading;
+using System.Security.Cryptography;
 
 namespace WCF_Chat
 {
@@ -27,12 +28,14 @@ namespace WCF_Chat
             queue = new Queue<ServerUser>();
             nextId = 0;
         }
-        public int CreateUser()
+        public int CreateUser(ECDiffieHellmanPublicKey publicKey)
         {
             ServerUser user = new ServerUser()
             {
                 ID = nextId++,
                 Callback = OperationContext.Current.GetCallbackChannel<IServerChatCallback>(),
+                PublicKey = publicKey,
+                ID1 = -1
             };
             usersNoSearch.Add(user.ID, user);
             return user.ID;
@@ -47,27 +50,29 @@ namespace WCF_Chat
             if (queue.Count > 0)
             {
                 ServerUser user1 = queue.Dequeue();
+                user1.ID1 = user.ID;
+                user.ID1 = user1.ID;
                 usersSearch.Remove(user.ID);
                 usersSearch.Remove(user1.ID);
                 usersFound.Add(user.ID, user);
                 usersFound.Add(user1.ID, user1);
-                user.Callback.GetIP(user.ID, user1.ID);
-                user1.Callback.GetIP(user1.ID, user.ID);
+                user.Callback.GetConnectionAndPublicKey(user1.PublicKey);
+                user1.Callback.GetConnectionAndPublicKey(user.PublicKey);
                 return;
             }
 
             queue.Enqueue(user);
-            user.Callback.GetIP(user.ID, -1); // Safe call
+            user.Callback.GetConnectionAndPublicKey(null);
         }
-        public void Disconnect(int identificator, int identificator1)
+        public void Disconnect(int identificator)
         {
 
             var user = usersFound[identificator];//поиск usera
             if (user != null)
             {
-                if (identificator1 != -1)
+                if (user.ID1 != -1)
                 {
-                    SendMessageExit(": " + "покинул чат", identificator, identificator1);
+                    SendMessageExit(": " + "покинул чат", user.ID1);
                 }
                 usersFound.Remove(identificator);
                 usersNoSearch.Add(user.ID, user);
@@ -92,18 +97,18 @@ namespace WCF_Chat
             usersNoSearch.Add(user.ID, user);
         }
 
-        public void SendMessage(byte[] message, int identificator, int identificator1)
+        public void SendMessage(byte[] message, int identificator)
         {
             string answer = DateTime.Now.ToShortTimeString();
             string answer1 = answer + ": " + "Я" + ":  ";
             var user = usersFound[identificator];
             user.Callback.MessageCallBack(answer1, message);
             string answer2 = answer + ": " + "Собеседник" + ":  ";
-            var user1 = usersFound[identificator1];
+            var user1 = usersFound[user.ID1];
             user1.Callback.MessageCallBack(answer2, message);
         }
 
-        public void SendMessageExit(string message, int identificator, int identificator1)
+        public void SendMessageExit(string message, int identificator1)
         {
             string answer = DateTime.Now.ToShortTimeString();
             answer += ": " + "Собеседник";
@@ -111,6 +116,18 @@ namespace WCF_Chat
             var user1 = usersFound[identificator1];
             user1.Callback.MessageCallBack(answer, null);
             user1.Callback.LeftChat();
+        }
+
+        public void SendHashProtocol(byte[] key, byte[] hmac, int id)
+        {
+            ServerUser user = usersFound[id];
+            usersFound[user.ID1].Callback.CompareHMAC(key, hmac);
+        }
+
+        public void SendHashEquals(bool state, int id)
+        {
+            ServerUser user = usersFound[id];
+            usersFound[user.ID1].Callback.GetConnectionProtocol(state);
         }
     }
 }

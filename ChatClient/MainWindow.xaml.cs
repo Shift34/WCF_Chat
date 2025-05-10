@@ -17,6 +17,7 @@ using System.Windows.Shapes;
 using ChatClient.ServiceChat;
 using ChatClient.ProtocolSignal;
 using System.Security.Cryptography;
+using System.Security.Policy;
 namespace ChatClient
 {
     /// <summary>
@@ -26,22 +27,24 @@ namespace ChatClient
     public partial class MainWindow : Window, IServiceChatCallback
     {
         private ServiceChat.ServiceChatClient client;
+        private ECDiffieHellman alice;
+        private byte[] aliceSharedSecret;
         private State state {get; set;}
         private int ID = -1;
-        private int ID1 = 0;
 
         private enum State
         {
             Search,
             Found,
+            FoundNoClient,
             NoSearch
         }
         public MainWindow()
         {
             InitializeComponent();
-            ECDiffieHellman alice = ECDiffieHellman.Create(GostCurve.GetGost3410Curve());
+            alice = ECDiffieHellman.Create(GostCurve.GetGost3410Curve());
             client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));
-            ID = client.CreateUser();
+            ID = client.CreateUser(alice.PublicKey);
             state = State.NoSearch;
             ListViewMessage.Visibility = Visibility.Hidden;
             TextBoxMessage.Visibility = Visibility.Hidden;
@@ -53,14 +56,14 @@ namespace ChatClient
 
         private void DisconnectUser()
         {
-            if (ID1 != -1)
+            if (state == State.Found)
             {
-                client.Disconnect(ID, ID1);
-                ID1 = -1;
+                client.Disconnect(ID);
+                state = State.NoSearch;
             }
             else
             {
-                client.Disconnect(ID, -1);
+                client.Disconnect(ID);
             }
             LabelState.Content = "Состояние: Стандартное";
             Button1.Content = "Найти собеседника";
@@ -95,18 +98,22 @@ namespace ChatClient
             DisconnectUser();
         }
 
-        public void GetIP(int ID, int ID1)
+        public void GetConnectionAndPublicKey(ECDiffieHellmanPublicKey publickey)
         {
-            this.ID = ID;
-            this.ID1 = ID1;
-            if (ID1 != -1)
+            if (publickey != null)
             {
-                LabelState.Content = "Состояние: Ваш собеседник найден";
-                Button1.Content = "Отключиться";
-                ListViewMessage.Visibility = Visibility.Visible;
-                TextBoxMessage.Visibility = Visibility.Visible;
                 state = State.Found;
-                TextBoxMessage.IsEnabled = true;
+            }
+            else
+            {
+                state = State.Search;
+            }
+
+            aliceSharedSecret = SignalProtocolExample.GenerateSharedSecret(publickey, alice);
+
+            if (state == State.Found)
+            {
+                TestProtocol();
             }
             else
             {
@@ -115,13 +122,46 @@ namespace ChatClient
                 state = State.Search;
             }
         }
+        public void TestProtocol()
+        {
+            byte[] nonce = new byte[32];
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(nonce);
+            }
+            // Вычисляем HMAC
+            byte[] hmac = SignalProtocolExample.ComputeHmac(nonce, aliceSharedSecret);
 
+            // Отправляем nonce и hmac Клиенту 2 (но не секрет!)
+            client.SendHashProtocol(nonce, hmac, ID);
+        }
+        public void GetConnectionProtocol(bool work)
+        {
+            if (work)
+            {
+                LabelState.Content = "Состояние: Ваш собеседник найден";
+                Button1.Content = "Отключиться";
+                ListViewMessage.Visibility = Visibility.Visible;
+                TextBoxMessage.Visibility = Visibility.Visible;
+                state = State.Found;
+                TextBoxMessage.IsEnabled = true;
+            }
+        }
+
+        public void CompareHMAC(byte[] key, byte[] hmac)
+        {
+            if(SignalProtocolExample.ComputeHmac(key, aliceSharedSecret) == hmac)
+            {
+                client.SendHashEquals(true, ID);
+            }
+
+        }
         public void LeftChat()
         {
             LabelState.Content = "Состояние: Чат без собеседника";
             TextBoxMessage.IsEnabled = false;
             TextBoxMessage.Clear();
-            ID1 = -1;
+            state = State.FoundNoClient;
         }
 
         private void Button2_Click_1(object sender, RoutedEventArgs e)
@@ -193,11 +233,12 @@ namespace ChatClient
                     string testString = TextBoxMessage.Text;
                     byte[] testBytes = ASCIIEncoding.UTF8.GetBytes(testString);
                     byte[] result = encoder.Encode(testBytes, testBytes.Length);
-                    client.SendMessage(result, ID, ID1);
+                    client.SendMessage(result, ID);
                     TextBoxMessage.Text = string.Empty;
                 }
             }
         }
+
 
     }
 }

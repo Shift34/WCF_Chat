@@ -16,10 +16,10 @@ namespace ChatClient.ServiceChat {
     public interface IServiceChat {
         
         [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/CreateUser", ReplyAction="http://tempuri.org/IServiceChat/CreateUserResponse")]
-        int CreateUser();
+        int CreateUser(System.Security.Cryptography.ECDiffieHellmanPublicKey publicKey);
         
         [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/CreateUser", ReplyAction="http://tempuri.org/IServiceChat/CreateUserResponse")]
-        System.Threading.Tasks.Task<int> CreateUserAsync();
+        System.Threading.Tasks.Task<int> CreateUserAsync(System.Security.Cryptography.ECDiffieHellmanPublicKey publicKey);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/Connect")]
         void Connect(int myID);
@@ -28,10 +28,10 @@ namespace ChatClient.ServiceChat {
         System.Threading.Tasks.Task ConnectAsync(int myID);
         
         [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/Disconnect", ReplyAction="http://tempuri.org/IServiceChat/DisconnectResponse")]
-        void Disconnect(int identificator, int indetificator1);
+        void Disconnect(int identificator);
         
         [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/Disconnect", ReplyAction="http://tempuri.org/IServiceChat/DisconnectResponse")]
-        System.Threading.Tasks.Task DisconnectAsync(int identificator, int indetificator1);
+        System.Threading.Tasks.Task DisconnectAsync(int identificator);
         
         [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/RemoveUserSearch", ReplyAction="http://tempuri.org/IServiceChat/RemoveUserSearchResponse")]
         void RemoveUserSearch(int identificator);
@@ -40,16 +40,28 @@ namespace ChatClient.ServiceChat {
         System.Threading.Tasks.Task RemoveUserSearchAsync(int identificator);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendMessage")]
-        void SendMessage(byte[] bytes, int identificator, int identificator1);
+        void SendMessage(byte[] message, int identificator);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendMessage")]
-        System.Threading.Tasks.Task SendMessageAsync(byte[] bytes, int identificator, int identificator1);
+        System.Threading.Tasks.Task SendMessageAsync(byte[] message, int identificator);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendMessageExit")]
-        void SendMessageExit(string message, int identificator, int identificator1);
+        void SendMessageExit(string message, int identificator1);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendMessageExit")]
-        System.Threading.Tasks.Task SendMessageExitAsync(string message, int identificator, int identificator1);
+        System.Threading.Tasks.Task SendMessageExitAsync(string message, int identificator1);
+        
+        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/SendHashProtocol", ReplyAction="http://tempuri.org/IServiceChat/SendHashProtocolResponse")]
+        void SendHashProtocol(byte[] key, byte[] hmac, int id);
+        
+        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/SendHashProtocol", ReplyAction="http://tempuri.org/IServiceChat/SendHashProtocolResponse")]
+        System.Threading.Tasks.Task SendHashProtocolAsync(byte[] key, byte[] hmac, int id);
+        
+        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/SendHashEquals", ReplyAction="http://tempuri.org/IServiceChat/SendHashEqualsResponse")]
+        void SendHashEquals(bool state, int id);
+        
+        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/SendHashEquals", ReplyAction="http://tempuri.org/IServiceChat/SendHashEqualsResponse")]
+        System.Threading.Tasks.Task SendHashEqualsAsync(bool state, int id);
     }
     
     [System.CodeDom.Compiler.GeneratedCodeAttribute("System.ServiceModel", "4.0.0.0")]
@@ -58,11 +70,17 @@ namespace ChatClient.ServiceChat {
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/MessageCallBack")]
         void MessageCallBack(string message, byte[] bytes);
         
-        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/GetIP")]
-        void GetIP(int ID, int ID1);
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/GetConnectionAndPublicKey")]
+        void GetConnectionAndPublicKey(System.Security.Cryptography.ECDiffieHellmanPublicKey publickey);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/LeftChat")]
         void LeftChat();
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/CompareHMAC")]
+        void CompareHMAC(byte[] key, byte[] hmac);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/GetConnectionProtocol")]
+        void GetConnectionProtocol(bool state);
     }
     
     [System.CodeDom.Compiler.GeneratedCodeAttribute("System.ServiceModel", "4.0.0.0")]
@@ -93,12 +111,12 @@ namespace ChatClient.ServiceChat {
                 base(callbackInstance, binding, remoteAddress) {
         }
         
-        public int CreateUser() {
-            return base.Channel.CreateUser();
+        public int CreateUser(System.Security.Cryptography.ECDiffieHellmanPublicKey publicKey) {
+            return base.Channel.CreateUser(publicKey);
         }
         
-        public System.Threading.Tasks.Task<int> CreateUserAsync() {
-            return base.Channel.CreateUserAsync();
+        public System.Threading.Tasks.Task<int> CreateUserAsync(System.Security.Cryptography.ECDiffieHellmanPublicKey publicKey) {
+            return base.Channel.CreateUserAsync(publicKey);
         }
         
         public void Connect(int myID) {
@@ -109,12 +127,12 @@ namespace ChatClient.ServiceChat {
             return base.Channel.ConnectAsync(myID);
         }
         
-        public void Disconnect(int identificator, int indetificator1) {
-            base.Channel.Disconnect(identificator, indetificator1);
+        public void Disconnect(int identificator) {
+            base.Channel.Disconnect(identificator);
         }
         
-        public System.Threading.Tasks.Task DisconnectAsync(int identificator, int indetificator1) {
-            return base.Channel.DisconnectAsync(identificator, indetificator1);
+        public System.Threading.Tasks.Task DisconnectAsync(int identificator) {
+            return base.Channel.DisconnectAsync(identificator);
         }
         
         public void RemoveUserSearch(int identificator) {
@@ -125,20 +143,36 @@ namespace ChatClient.ServiceChat {
             return base.Channel.RemoveUserSearchAsync(identificator);
         }
         
-        public void SendMessage(byte[] bytes, int identificator, int identificator1) {
-            base.Channel.SendMessage(bytes, identificator, identificator1);
+        public void SendMessage(byte[] message, int identificator) {
+            base.Channel.SendMessage(message, identificator);
         }
         
-        public System.Threading.Tasks.Task SendMessageAsync(byte[] bytes, int identificator, int identificator1) {
-            return base.Channel.SendMessageAsync(bytes, identificator, identificator1);
+        public System.Threading.Tasks.Task SendMessageAsync(byte[] message, int identificator) {
+            return base.Channel.SendMessageAsync(message, identificator);
         }
         
-        public void SendMessageExit(string message, int identificator, int identificator1) {
-            base.Channel.SendMessageExit(message, identificator, identificator1);
+        public void SendMessageExit(string message, int identificator1) {
+            base.Channel.SendMessageExit(message, identificator1);
         }
         
-        public System.Threading.Tasks.Task SendMessageExitAsync(string message, int identificator, int identificator1) {
-            return base.Channel.SendMessageExitAsync(message, identificator, identificator1);
+        public System.Threading.Tasks.Task SendMessageExitAsync(string message, int identificator1) {
+            return base.Channel.SendMessageExitAsync(message, identificator1);
+        }
+        
+        public void SendHashProtocol(byte[] key, byte[] hmac, int id) {
+            base.Channel.SendHashProtocol(key, hmac, id);
+        }
+        
+        public System.Threading.Tasks.Task SendHashProtocolAsync(byte[] key, byte[] hmac, int id) {
+            return base.Channel.SendHashProtocolAsync(key, hmac, id);
+        }
+        
+        public void SendHashEquals(bool state, int id) {
+            base.Channel.SendHashEquals(state, id);
+        }
+        
+        public System.Threading.Tasks.Task SendHashEqualsAsync(bool state, int id) {
+            return base.Channel.SendHashEqualsAsync(state, id);
         }
     }
 }
