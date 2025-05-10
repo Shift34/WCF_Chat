@@ -27,23 +27,23 @@ namespace ChatClient.ServiceChat {
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/Connect")]
         System.Threading.Tasks.Task ConnectAsync(int myID);
         
-        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/Disconnect", ReplyAction="http://tempuri.org/IServiceChat/DisconnectResponse")]
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/Disconnect")]
         void Disconnect(int identificator);
         
-        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/Disconnect", ReplyAction="http://tempuri.org/IServiceChat/DisconnectResponse")]
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/Disconnect")]
         System.Threading.Tasks.Task DisconnectAsync(int identificator);
         
-        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/RemoveUserSearch", ReplyAction="http://tempuri.org/IServiceChat/RemoveUserSearchResponse")]
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/RemoveUserSearch")]
         void RemoveUserSearch(int identificator);
         
-        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/RemoveUserSearch", ReplyAction="http://tempuri.org/IServiceChat/RemoveUserSearchResponse")]
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/RemoveUserSearch")]
         System.Threading.Tasks.Task RemoveUserSearchAsync(int identificator);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendMessage")]
-        void SendMessage(byte[] message, int identificator);
+        void SendMessage(byte[] hmac, byte[] message, int identificator);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendMessage")]
-        System.Threading.Tasks.Task SendMessageAsync(byte[] message, int identificator);
+        System.Threading.Tasks.Task SendMessageAsync(byte[] hmac, byte[] message, int identificator);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendMessageExit")]
         void SendMessageExit(string message, int identificator1);
@@ -68,7 +68,7 @@ namespace ChatClient.ServiceChat {
     public interface IServiceChatCallback {
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/MessageCallBack")]
-        void MessageCallBack(string message, byte[] bytes);
+        void MessageCallBack(byte[] hmac, string message, byte[] bytes);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/GetConnectionAndPublicKey")]
         void GetConnectionAndPublicKey(byte[] publickey);
@@ -81,6 +81,9 @@ namespace ChatClient.ServiceChat {
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/GetConnectionProtocol")]
         void GetConnectionProtocol(bool state);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/MessageNotification")]
+        void MessageNotification(string message);
     }
     
     [System.CodeDom.Compiler.GeneratedCodeAttribute("System.ServiceModel", "4.0.0.0")]
@@ -143,12 +146,12 @@ namespace ChatClient.ServiceChat {
             return base.Channel.RemoveUserSearchAsync(identificator);
         }
         
-        public void SendMessage(byte[] message, int identificator) {
-            base.Channel.SendMessage(message, identificator);
+        public void SendMessage(byte[] hmac, byte[] message, int identificator) {
+            base.Channel.SendMessage(hmac, message, identificator);
         }
         
-        public System.Threading.Tasks.Task SendMessageAsync(byte[] message, int identificator) {
-            return base.Channel.SendMessageAsync(message, identificator);
+        public System.Threading.Tasks.Task SendMessageAsync(byte[] hmac, byte[] message, int identificator) {
+            return base.Channel.SendMessageAsync(hmac, message, identificator);
         }
         
         public void SendMessageExit(string message, int identificator1) {

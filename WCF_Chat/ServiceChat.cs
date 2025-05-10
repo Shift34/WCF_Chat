@@ -99,15 +99,15 @@ namespace WCF_Chat
             usersNoSearch.Add(user.ID, user);
         }
 
-        public void SendMessage(byte[] message, int identificator)
+        public void SendMessage(byte[] hmac, byte[] message, int identificator)
         {
             string answer = DateTime.Now.ToShortTimeString();
             string answer1 = answer + ": " + "Я" + ":  ";
             var user = usersFound[identificator];
-            user.Callback.MessageCallBack(answer1, message);
+            user.Callback.MessageCallBack(hmac, answer1, message);
             string answer2 = answer + ": " + "Собеседник" + ":  ";
             var user1 = usersFound[user.ID1];
-            user1.Callback.MessageCallBack(answer2, message);
+            user1.Callback.MessageCallBack(hmac, answer2, message);
         }
 
         public void SendMessageExit(string message, int identificator1)
@@ -116,7 +116,7 @@ namespace WCF_Chat
             answer += ": " + "Собеседник";
             answer += message;
             var user1 = usersFound[identificator1];
-            user1.Callback.MessageCallBack(answer, null);
+            user1.Callback.MessageNotification(answer);
             user1.Callback.LeftChat();
         }
 

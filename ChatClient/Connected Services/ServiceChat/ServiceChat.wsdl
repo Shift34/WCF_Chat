@@ -47,14 +47,8 @@
   <wsdl:message name="IServiceChat_Disconnect_InputMessage">
     <wsdl:part name="parameters" element="tns:Disconnect" />
   </wsdl:message>
-  <wsdl:message name="IServiceChat_Disconnect_OutputMessage">
-    <wsdl:part name="parameters" element="tns:DisconnectResponse" />
-  </wsdl:message>
   <wsdl:message name="IServiceChat_RemoveUserSearch_InputMessage">
     <wsdl:part name="parameters" element="tns:RemoveUserSearch" />
-  </wsdl:message>
-  <wsdl:message name="IServiceChat_RemoveUserSearch_OutputMessage">
-    <wsdl:part name="parameters" element="tns:RemoveUserSearchResponse" />
   </wsdl:message>
   <wsdl:message name="IServiceChat_SendMessage_InputMessage">
     <wsdl:part name="parameters" element="tns:SendMessage" />
@@ -83,6 +77,9 @@
   <wsdl:message name="IServiceChat_GetConnectionProtocol_OutputCallbackMessage">
     <wsdl:part name="parameters" element="tns:GetConnectionProtocol" />
   </wsdl:message>
+  <wsdl:message name="IServiceChat_MessageNotification_OutputCallbackMessage">
+    <wsdl:part name="parameters" element="tns:MessageNotification" />
+  </wsdl:message>
   <wsdl:portType name="IServiceChat">
     <wsdl:operation name="CreateUser">
       <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/CreateUser" message="tns:IServiceChat_CreateUser_InputMessage" />
@@ -93,11 +90,9 @@
     </wsdl:operation>
     <wsdl:operation name="Disconnect">
       <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/Disconnect" message="tns:IServiceChat_Disconnect_InputMessage" />
-      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/DisconnectResponse" message="tns:IServiceChat_Disconnect_OutputMessage" />
     </wsdl:operation>
     <wsdl:operation name="RemoveUserSearch">
       <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/RemoveUserSearch" message="tns:IServiceChat_RemoveUserSearch_InputMessage" />
-      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/RemoveUserSearchResponse" message="tns:IServiceChat_RemoveUserSearch_OutputMessage" />
     </wsdl:operation>
     <wsdl:operation name="SendMessage">
       <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendMessage" message="tns:IServiceChat_SendMessage_InputMessage" />
@@ -126,6 +121,9 @@
     <wsdl:operation name="GetConnectionProtocol">
       <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/GetConnectionProtocol" message="tns:IServiceChat_GetConnectionProtocol_OutputCallbackMessage" />
     </wsdl:operation>
+    <wsdl:operation name="MessageNotification">
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/MessageNotification" message="tns:IServiceChat_MessageNotification_OutputCallbackMessage" />
+    </wsdl:operation>
   </wsdl:portType>
   <wsdl:binding name="NetTcpBinding_IServiceChat" type="tns:IServiceChat">
     <wsp:PolicyReference URI="#NetTcpBinding_IServiceChat_policy" />
@@ -150,18 +148,12 @@
       <wsdl:input>
         <soap12:body use="literal" />
       </wsdl:input>
-      <wsdl:output>
-        <soap12:body use="literal" />
-      </wsdl:output>
     </wsdl:operation>
     <wsdl:operation name="RemoveUserSearch">
       <soap12:operation soapAction="http://tempuri.org/IServiceChat/RemoveUserSearch" style="document" />
       <wsdl:input>
         <soap12:body use="literal" />
       </wsdl:input>
-      <wsdl:output>
-        <soap12:body use="literal" />
-      </wsdl:output>
     </wsdl:operation>
     <wsdl:operation name="SendMessage">
       <soap12:operation soapAction="http://tempuri.org/IServiceChat/SendMessage" style="document" />
@@ -213,6 +205,12 @@
     </wsdl:operation>
     <wsdl:operation name="GetConnectionProtocol">
       <soap12:operation soapAction="http://tempuri.org/IServiceChat/GetConnectionProtocol" style="document" />
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="MessageNotification">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/MessageNotification" style="document" />
       <wsdl:output>
         <soap12:body use="literal" />
       </wsdl:output>

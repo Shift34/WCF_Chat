@@ -228,9 +228,12 @@ namespace ChatClient
                 if (client != null)
                 {
                     string testString = TextBoxMessage.Text;
-                    byte[] encryptedMessage = kuznechik.KuzEncript(Encoding.UTF8.GetBytes(testString), aesKey);
 
-                    client.SendMessage(encryptedMessage, ID);
+                    byte[] byteMessage = Encoding.UTF8.GetBytes(testString);
+                    byte[] hmac = SignalProtocolExample.ComputeHmac(hmacKey, byteMessage);
+                    byte[] encryptedMessage = kuznechik.KuzEncript(byteMessage, aesKey);
+
+                    client.SendMessage(hmac, encryptedMessage, ID);
                     TextBoxMessage.Text = string.Empty;
                 }
             }
@@ -248,5 +251,29 @@ namespace ChatClient
             ListViewMessage.ScrollIntoView(ListViewMessage.Items[ListViewMessage.Items.Count - 1]);
         }
 
+        public void MessageNotification(string text)
+        {
+            ListViewMessage.Items.Add(text);
+            ListViewMessage.ScrollIntoView(ListViewMessage.Items[ListViewMessage.Items.Count - 1]);
+        }
+
+        public void MessageCallBack(byte[] hmac, string message, byte[] bytes)
+        {
+            string text = message;
+            if (bytes != null)
+            {
+                byte[] decryptedMessage = kuznechik.KuzDecript(bytes, aesKey);
+                byte[] newHmac = SignalProtocolExample.ComputeHmac(hmacKey, decryptedMessage);
+
+                if (newHmac.SequenceEqual(hmac))
+                {
+                    string decryptedText = Encoding.UTF8.GetString(decryptedMessage);
+                    text += decryptedText;
+                }
+                
+            }
+            ListViewMessage.Items.Add(text);
+            ListViewMessage.ScrollIntoView(ListViewMessage.Items[ListViewMessage.Items.Count - 1]);
+        }
     }
 }

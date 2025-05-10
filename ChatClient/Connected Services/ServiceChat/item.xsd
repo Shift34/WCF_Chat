@@ -28,11 +28,6 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-  <xs:element name="DisconnectResponse">
-    <xs:complexType>
-      <xs:sequence />
-    </xs:complexType>
-  </xs:element>
   <xs:element name="RemoveUserSearch">
     <xs:complexType>
       <xs:sequence>
@@ -40,14 +35,10 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-  <xs:element name="RemoveUserSearchResponse">
-    <xs:complexType>
-      <xs:sequence />
-    </xs:complexType>
-  </xs:element>
   <xs:element name="SendMessage">
     <xs:complexType>
       <xs:sequence>
+        <xs:element minOccurs="0" name="hmac" nillable="true" type="xs:base64Binary" />
         <xs:element minOccurs="0" name="message" nillable="true" type="xs:base64Binary" />
         <xs:element minOccurs="0" name="identificator" type="xs:int" />
       </xs:sequence>
@@ -81,6 +72,7 @@
   <xs:element name="MessageCallBack">
     <xs:complexType>
       <xs:sequence>
+        <xs:element minOccurs="0" name="hmac" nillable="true" type="xs:base64Binary" />
         <xs:element minOccurs="0" name="message" nillable="true" type="xs:string" />
         <xs:element minOccurs="0" name="bytes" nillable="true" type="xs:base64Binary" />
       </xs:sequence>
@@ -110,6 +102,13 @@
     <xs:complexType>
       <xs:sequence>
         <xs:element minOccurs="0" name="state" type="xs:boolean" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="MessageNotification">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="message" nillable="true" type="xs:string" />
       </xs:sequence>
     </xs:complexType>
   </xs:element>

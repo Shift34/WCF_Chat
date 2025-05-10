@@ -17,13 +17,13 @@ namespace WCF_Chat
         [OperationContract(IsOneWay = true)]
         void Connect(int myID);
 
-        [OperationContract]
+        [OperationContract(IsOneWay = true)]
         void Disconnect(int identificator);
-        [OperationContract]
+        [OperationContract(IsOneWay = true)]
         void RemoveUserSearch(int identificator);
 
         [OperationContract(IsOneWay = true)]
-        void SendMessage(byte[] message, int identificator);
+        void SendMessage(byte[] hmac, byte[] message, int identificator);
         [OperationContract(IsOneWay = true)]
         void SendMessageExit(string message, int identificator1);
 
@@ -37,7 +37,7 @@ namespace WCF_Chat
     public interface IServerChatCallback
     {
         [OperationContract(IsOneWay = true)]
-        void MessageCallBack(string message, byte[] bytes);
+        void MessageCallBack(byte[] hmac, string message, byte[] bytes);
         [OperationContract(IsOneWay = true)]
         void GetConnectionAndPublicKey(byte[] publickey);
         [OperationContract(IsOneWay = true)]
@@ -48,6 +48,9 @@ namespace WCF_Chat
 
         [OperationContract(IsOneWay = true)]
         void GetConnectionProtocol(bool state);
+
+        [OperationContract(IsOneWay = true)]
+        void MessageNotification(string message);
 
     }
 }
