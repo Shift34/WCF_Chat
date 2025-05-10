@@ -44,9 +44,6 @@
   <wsdl:message name="IServiceChat_Connect_InputMessage">
     <wsdl:part name="parameters" element="tns:Connect" />
   </wsdl:message>
-  <wsdl:message name="IServiceChat_Connect_OutputMessage">
-    <wsdl:part name="parameters" element="tns:ConnectResponse" />
-  </wsdl:message>
   <wsdl:message name="IServiceChat_Disconnect_InputMessage">
     <wsdl:part name="parameters" element="tns:Disconnect" />
   </wsdl:message>
@@ -81,7 +78,6 @@
     </wsdl:operation>
     <wsdl:operation name="Connect">
       <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/Connect" message="tns:IServiceChat_Connect_InputMessage" />
-      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/ConnectResponse" message="tns:IServiceChat_Connect_OutputMessage" />
     </wsdl:operation>
     <wsdl:operation name="Disconnect">
       <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/Disconnect" message="tns:IServiceChat_Disconnect_InputMessage" />
@@ -124,9 +120,6 @@
       <wsdl:input>
         <soap12:body use="literal" />
       </wsdl:input>
-      <wsdl:output>
-        <soap12:body use="literal" />
-      </wsdl:output>
     </wsdl:operation>
     <wsdl:operation name="Disconnect">
       <soap12:operation soapAction="http://tempuri.org/IServiceChat/Disconnect" style="document" />

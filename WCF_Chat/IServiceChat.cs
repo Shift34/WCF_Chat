@@ -13,8 +13,8 @@ namespace WCF_Chat
         [OperationContract]
         int CreateUser();
 
-        [OperationContract]
-        bool Connect(int myID);
+        [OperationContract(IsOneWay = true)]
+        void Connect(int myID);
 
         [OperationContract]
         void Disconnect(int identificator, int indetificator1);

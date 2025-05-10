@@ -29,65 +29,67 @@ namespace WCF_Chat
         }
         public int CreateUser()
         {
-
-                ServerUser user = new ServerUser()
-                {
-                    ID = nextId++,
-                    Callback = OperationContext.Current.GetCallbackChannel<IServerChatCallback>(),
-                    State = State.Search
-                };
-                usersNoSearch.Add(user.ID, user);
-                return user.ID;
-
+            ServerUser user = new ServerUser()
+            {
+                ID = nextId++,
+                Callback = OperationContext.Current.GetCallbackChannel<IServerChatCallback>(),
+            };
+            usersNoSearch.Add(user.ID, user);
+            return user.ID;
         }
 
-        public bool Connect(int myID)
+        public void Connect(int myID)
         {
+            ServerUser user = usersNoSearch[myID];
+            usersNoSearch.Remove(myID);
+            usersSearch.Add(myID, user);
 
-                ServerUser user = usersNoSearch[myID];
-                usersNoSearch.Remove(myID);
-                usersSearch.Add(myID, user);
-
-
-                if (queue.Count > 0)
-                {
-                    ServerUser user1 =  queue.Dequeue();
+            if (queue.Count > 0)
+            {
+                ServerUser user1 = queue.Dequeue();
+                usersSearch.Remove(user.ID);
+                usersSearch.Remove(user1.ID);
+                usersFound.Add(user.ID, user);
+                usersFound.Add(user1.ID, user1);
                 user.Callback.GetIP(user.ID, user1.ID);
-                if (user1 != null)
-                {
-                    user1.Callback.GetIP(user1.ID, user.ID);
-                }
-                return true;
-                }
+                user1.Callback.GetIP(user1.ID, user.ID);
+                return;
+            }
 
-                queue.Enqueue(user);
-                user.Callback.GetIP(user.ID, -1); // Safe call
-                return false;
-
+            queue.Enqueue(user);
+            user.Callback.GetIP(user.ID, -1); // Safe call
         }
-        public void Disconnect(int identificator, int indetificator1)
+        public void Disconnect(int identificator, int identificator1)
         {
+
             var user = usersFound[identificator];//поиск usera
-            var user1 = usersFound[indetificator1];
             if (user != null)
             {
-                SendMessageExit(": " + "покинул чат", identificator, indetificator1);
+                if (identificator1 != -1)
+                {
+                    SendMessageExit(": " + "покинул чат", identificator, identificator1);
+                }
                 usersFound.Remove(identificator);
                 usersNoSearch.Add(user.ID, user);
-                if(user1 != null)
-                {
-                    usersFound.Remove(indetificator1);
-                    usersNoSearch.Add(user1.ID, user1);
-                }
             }
         }
 
         public void RemoveUserSearch(int identificator)
         {
-            if (!usersSearch.Remove(identificator))
+            ServerUser user = usersSearch[identificator];
+            int initialCount = queue.Count;
+
+            for (int i = 0; i < initialCount; i++)
             {
-                throw new Exception("Нельзя удалить не существующего пользователя");
+                ServerUser current = queue.Dequeue();
+                if (current != user)
+                {
+                    queue.Enqueue(current); // Возвращаем обратно, если не удаляем
+                }
             }
+
+            usersSearch.Remove(identificator);
+            usersNoSearch.Add(user.ID, user);
         }
 
         public void SendMessage(byte[] message, int identificator, int identificator1)

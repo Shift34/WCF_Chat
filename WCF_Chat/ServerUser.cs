@@ -11,15 +11,8 @@ namespace WCF_Chat
     {
         public int ID { get; set; }
 
-        public State State {get;set;}
 
         public IServerChatCallback Callback { get; set; }
 
-    }
-    public enum State
-    {
-        Search,
-        Found,
-        NoSearch
     }
 }

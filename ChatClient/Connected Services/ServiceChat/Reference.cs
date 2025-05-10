@@ -21,11 +21,11 @@ namespace ChatClient.ServiceChat {
         [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/CreateUser", ReplyAction="http://tempuri.org/IServiceChat/CreateUserResponse")]
         System.Threading.Tasks.Task<int> CreateUserAsync();
         
-        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/Connect", ReplyAction="http://tempuri.org/IServiceChat/ConnectResponse")]
-        bool Connect(int myID);
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/Connect")]
+        void Connect(int myID);
         
-        [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/Connect", ReplyAction="http://tempuri.org/IServiceChat/ConnectResponse")]
-        System.Threading.Tasks.Task<bool> ConnectAsync(int myID);
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/Connect")]
+        System.Threading.Tasks.Task ConnectAsync(int myID);
         
         [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/Disconnect", ReplyAction="http://tempuri.org/IServiceChat/DisconnectResponse")]
         void Disconnect(int identificator, int indetificator1);
@@ -101,11 +101,11 @@ namespace ChatClient.ServiceChat {
             return base.Channel.CreateUserAsync();
         }
         
-        public bool Connect(int myID) {
-            return base.Channel.Connect(myID);
+        public void Connect(int myID) {
+            base.Channel.Connect(myID);
         }
         
-        public System.Threading.Tasks.Task<bool> ConnectAsync(int myID) {
+        public System.Threading.Tasks.Task ConnectAsync(int myID) {
             return base.Channel.ConnectAsync(myID);
         }
         

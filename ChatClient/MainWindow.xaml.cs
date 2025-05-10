@@ -40,31 +40,15 @@ namespace ChatClient
         {
             InitializeComponent();
             ECDiffieHellman alice = ECDiffieHellman.Create(GostCurve.GetGost3410Curve());
-
+            client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));
+            ID = client.CreateUser();
             state = State.NoSearch;
             ListViewMessage.Visibility = Visibility.Hidden;
             TextBoxMessage.Visibility = Visibility.Hidden;
         }
         private void Find()
         {
-            client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));
-            ID = client.CreateUser();
-            bool find = client.Connect(ID);
-            if (find)
-            {
-                LabelState.Content = "Состояние: Ваш собеседник найден";
-                Button1.Content = "Отключиться";
-                ListViewMessage.Visibility = Visibility.Visible;
-                TextBoxMessage.Visibility = Visibility.Visible;
-                state = State.Found;
-                TextBoxMessage.IsEnabled = true;
-            }
-            else
-            {
-                LabelState.Content = "Состояние: Поиск собеседника";
-                Button1.Content = "Отменить поиск";
-                state = State.Search;
-            }
+            client.Connect(ID);
         }
 
         private void DisconnectUser()
@@ -115,12 +99,21 @@ namespace ChatClient
         {
             this.ID = ID;
             this.ID1 = ID1;
-            LabelState.Content = "Состояние: Ваш собеседник найден";
-            Button1.Content = "Отключиться";
-            TextBoxMessage.IsEnabled = true;
-            ListViewMessage.Visibility = Visibility.Visible;
-            TextBoxMessage.Visibility = Visibility.Visible;
-            state = State.Found;
+            if (ID1 != -1)
+            {
+                LabelState.Content = "Состояние: Ваш собеседник найден";
+                Button1.Content = "Отключиться";
+                ListViewMessage.Visibility = Visibility.Visible;
+                TextBoxMessage.Visibility = Visibility.Visible;
+                state = State.Found;
+                TextBoxMessage.IsEnabled = true;
+            }
+            else
+            {
+                LabelState.Content = "Состояние: Поиск собеседника";
+                Button1.Content = "Отменить поиск";
+                state = State.Search;
+            }
         }
 
         public void LeftChat()
