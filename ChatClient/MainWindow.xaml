@@ -11,6 +11,69 @@
         AllowsTransparency="true"
         ResizeMode="CanResizeWithGrip"
         Title="MainWindow" Loaded="Window_Loaded" Closing="Window_Closing">
+    <Window.Resources>
+        <!-- Стиль для TextBox в стиле Discord -->
+        <Style x:Key="DiscordTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="#40444B"/>
+            <Setter Property="Foreground" Value="#DCDDDE"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontFamily" Value="Segoe UI, Arial"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="AcceptsReturn" Value="False"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="MinHeight" Value="44"/>
+            <Setter Property="MaxHeight" Value="150"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Grid>
+                            <!-- Фон с скругленными углами -->
+                            <Border x:Name="border" 
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="8"
+                        BorderThickness="1"
+                        BorderBrush="#00000000"
+                        SnapsToDevicePixels="True">
+                                <ScrollViewer x:Name="PART_ContentHost"
+                                
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                            </Border>
+
+                            <!-- Плейсхолдер -->
+                            <TextBlock x:Name="placeholderText"
+                          Text="Написать сообщение..."
+                          Foreground="#72767D"
+                          Margin="18,8,15,8"
+                          FontSize="15"             
+                          VerticalAlignment="Center"
+                          IsHitTestVisible="False"
+                          Visibility="Collapsed"/>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <!-- Показывать плейсхолдер когда текст пустой -->
+                            <Trigger Property="Text" Value="">
+                                <Setter TargetName="placeholderText" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+
+                            <!-- Эффект при фокусе -->
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#383C43"/>
+                            </Trigger>
+
+                            <!-- Эффект при наведении -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#383C43"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Grid x:Name="Grid">
         <Grid.RowDefinitions>
             <RowDefinition Height="25"/>
@@ -56,41 +119,50 @@
         <Grid Background="#36393f"
               Grid.Row="1">
             <Grid HorizontalAlignment="Stretch">
-                <Label x:Name="LabelState" HorizontalAlignment="Left"
-                       Content="Состояние: Стандартное"
-                       HorizontalContentAlignment="Center" 
-                       VerticalContentAlignment="Center"
-                       Height="75"
-                       Width="300"
-                       Foreground="LawnGreen"
-                       FontWeight="SemiBold" FontFamily="Arial">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="33*"/>
+                    <ColumnDefinition Width="33*"/>
+                    <ColumnDefinition Width="33*"/>
+                </Grid.ColumnDefinitions>
 
-                </Label>
-                <StackPanel HorizontalAlignment="Stretch" 
-                            Height="75">
-                    <Button x:Name="Button1" HorizontalContentAlignment="Center"
-                            Height="75"
-                            Width="300"   
-                            Content="Найти собеседника"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Foreground="NavajoWhite"
-                            FontWeight="Bold"
-                            Click="ButtonFindAndCancelAndDisconnect_Click" FontSize="16" FontFamily="Arial">
-                        
-                    </Button>
-                    
+                <Label x:Name="LabelState" 
+                   Grid.Column="0"
+                   Content="Состояние: Стандартное"
+                   HorizontalContentAlignment="Center" 
+                   VerticalContentAlignment="Center"
+                   Height="75"
+                   Foreground="LawnGreen"
+                   FontWeight="SemiBold" 
+                   FontFamily="Arial"/>
+
+                <!-- Центральная панель (40%) -->
+                <StackPanel Grid.Column="1"
+                    HorizontalAlignment="Stretch" 
+                    Height="75">
+                    <Button x:Name="Button1" 
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Height="75"  
+                        Content="Найти собеседника"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Foreground="NavajoWhite"
+                        FontWeight="Bold"
+                        Click="ButtonFindAndCancelAndDisconnect_Click" 
+                        FontSize="16" 
+                        FontFamily="Arial"/>
                 </StackPanel>
-                <Label x:Name="LabelTypeEncryption" HorizontalAlignment="Right"
-                       Content="Поточное шифрование RC4"
-                       HorizontalContentAlignment="Center" 
-                       VerticalContentAlignment="Center"
-                       Height="75"
-                       Width="300"
-                       Foreground="FloralWhite"
-                       FontWeight="SemiBold" 
-                       FontFamily="Arial">
-                </Label>
+
+                <!-- Правая метка (30%) -->
+                <Label x:Name="LabelTypeEncryption" 
+                   Grid.Column="2"
+                   Content="Протокол Signal"
+                   HorizontalContentAlignment="Center" 
+                   VerticalContentAlignment="Center"
+                   Height="75"
+                   Foreground="FloralWhite"
+                   FontWeight="SemiBold" 
+                   FontFamily="Arial"/>
             </Grid>
         </Grid>
         <Grid Background="#36393f"
@@ -99,7 +171,7 @@
                       Background="Transparent"
                       BorderThickness="0"
                       Foreground="Gray" FontSize="18" FontFamily="Arial">
-                        
+
             </ListView>
         </Grid>
         <Grid Background="#36393f"
@@ -107,15 +179,21 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="TextBoxMessage" Grid.Row="1"
-                     Height="50"
-                     HorizontalContentAlignment="Left"
-                     VerticalContentAlignment="Center"
-                     Grid.ColumnSpan="2" FontSize="16" KeyDown="TextBoxMessage_KeyDown"
-                     Foreground="Gray"
-                     FontWeight="Medium"
-                     Margin="8" 
-                     Background="Transparent"/>
+            <Border Grid.Row="1" 
+                Background="#36393F" 
+                Padding="16,0,16,16">
+                <Grid>
+                    
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Текстовое поле -->
+                    <TextBox x:Name="TextBoxMessage"
+                        Style="{StaticResource DiscordTextBoxStyle}"
+                        PreviewKeyDown="TextBox_PreviewKeyDown"/>
+                </Grid>
+            </Border>
         </Grid>
     </Grid>
 </Window>

@@ -19,6 +19,7 @@ using ChatClient.ProtocolSignal;
 using System.Security.Cryptography;
 using System.Security.Policy;
 using System.ServiceModel.Channels;
+using ChatClient.ViewModel;
 namespace ChatClient
 {
     /// <summary>
@@ -28,6 +29,7 @@ namespace ChatClient
     public partial class MainWindow : Window, IServiceChatCallback
     {
         private ServiceChat.ServiceChatClient client;
+        private readonly MainViewModel _viewModel;
         private ECDiffieHellman alice;
         private byte[] aliceSharedSecret;
         private byte[] aesKey;
@@ -46,6 +48,7 @@ namespace ChatClient
         public MainWindow()
         {
             InitializeComponent();
+            _viewModel = new MainViewModel();
             alice = ECDiffieHellman.Create(GostCurve.GetGost3410Curve());
             byte[] publicKey = alice.PublicKey.ToByteArray();
             client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));           
@@ -220,24 +223,6 @@ namespace ChatClient
             state = State.NoSearch;
         }
 
-
-        private void TextBoxMessage_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter)
-            {
-                if (client != null)
-                {
-                    string testString = TextBoxMessage.Text;
-
-                    byte[] byteMessage = Encoding.UTF8.GetBytes(testString);
-                    byte[] hmac = SignalProtocolExample.ComputeHmac(hmacKey, byteMessage);
-                    byte[] encryptedMessage = kuznechik.KuzEncript(byteMessage, aesKey);
-
-                    client.SendMessage(hmac, encryptedMessage, ID);
-                    TextBoxMessage.Text = string.Empty;
-                }
-            }
-        }
         public void MessageCallBack(string message, byte[] bytes = null)
         {
             string text = message;
@@ -274,6 +259,52 @@ namespace ChatClient
             }
             ListViewMessage.Items.Add(text);
             ListViewMessage.ScrollIntoView(ListViewMessage.Items[ListViewMessage.Items.Count - 1]);
+        }
+
+        private void TextBoxMessage_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            // Автоматическое увеличение высоты
+            if (TextBoxMessage.LineCount > 1 && TextBoxMessage.Height < 150)
+            {
+                TextBoxMessage.Height = TextBoxMessage.LineCount * 20;
+            }
+            else if (TextBoxMessage.LineCount <= 1)
+            {
+                TextBoxMessage.Height = 44;
+            }
+
+            // Можно добавить проверку на максимальную длину сообщения
+        }
+
+        private void TextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                if (Keyboard.Modifiers == ModifierKeys.Shift)
+                {
+                    var textBox = (TextBox)sender;
+                    int caretPos = textBox.CaretIndex;
+                    textBox.Text = textBox.Text.Insert(caretPos, Environment.NewLine);
+                    textBox.CaretIndex = caretPos + 1;
+                    e.Handled = true;
+                }
+                else
+                {
+                    if (client != null && !string.IsNullOrWhiteSpace(TextBoxMessage.Text))
+                    {
+                        e.Handled = true;
+
+                        string testString = TextBoxMessage.Text.Trim();
+
+                        byte[] byteMessage = Encoding.UTF8.GetBytes(testString);
+                        byte[] hmac = SignalProtocolExample.ComputeHmac(hmacKey, byteMessage);
+                        byte[] encryptedMessage = kuznechik.KuzEncript(byteMessage, aesKey);
+
+                        client.SendMessage(hmac, encryptedMessage, ID);
+                        TextBoxMessage.Text = string.Empty;
+                    }
+                }
+            }
         }
     }
 }
