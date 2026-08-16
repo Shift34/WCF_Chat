@@ -1,5 +1,4 @@
 ﻿using ChatClient.ProtocolSignal;
-using ChatClient.ServiceChat;
 using NAudio.Wave;
 using System;
 using System.Collections.Generic;
@@ -40,7 +39,7 @@ namespace ChatClient
         public event Action OnEncryptionKeyRotated;
 
         private bool _useMicrophone = true;
-        private IServiceChat _serviceClient;
+        private ChatHubClient _serviceClient;
         private int _userId;
 
         // Статистика
@@ -56,7 +55,7 @@ namespace ChatClient
             OnStatusChanged?.Invoke(enabled ? "🎤 Микрофон включен" : "🔇 Микрофон отключен");
         }
 
-        public SimpleVoiceCall(IServiceChat serviceClient, int userId)
+        public SimpleVoiceCall(ChatHubClient serviceClient, int userId)
         {
             _serviceClient = serviceClient;
             _userId = userId;
