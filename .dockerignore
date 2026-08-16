@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+.git
+.vs
+ChatClient
+ChatHost
+WCF_Chat
+*.md

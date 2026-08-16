@@ -1,18 +1,16 @@
 ﻿using ChatClient.Protocol_Signal;
 using ChatClient.ProtocolSignal;
-using ChatClient.ServiceChat;
 using ChatClient.ViewModel;
 using Org.BouncyCastle.Asn1.X9;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Policy;
-using System.ServiceModel;
-using System.ServiceModel.Channels;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,10 +28,9 @@ namespace ChatClient
     /// <summary>
     /// Логика взаимодействия для MainWindow.xaml
     /// </summary>
-    [CallbackBehavior(ConcurrencyMode = ConcurrencyMode.Multiple)]
-    public partial class MainWindow : Window, IServiceChatCallback
+    public partial class MainWindow : Window
     {
-        private ServiceChat.ServiceChatClient client;
+        private ChatHubClient client;
         private readonly MainViewModel _viewModel;
         private ECDiffieHellman alice;
         private byte[] aliceSharedSecret;
@@ -78,8 +75,33 @@ namespace ChatClient
             byte[] publicKey = alice.PublicKey.ToByteArray();
             _signature = new GostSignature();
             byte[] mySignPublicKey = _signature.GetPublicKey();
-            client = new ServiceChatClient(new System.ServiceModel.InstanceContext(this));           
-            ID = client.CreateUser(publicKey, mySignPublicKey);
+            string hubUrl = ConfigurationManager.AppSettings["ChatHubUrl"] ?? "http://localhost:5000/chat";
+            client = new ChatHubClient(hubUrl);
+            client.GetConnectionAndPublicKey += GetConnectionAndPublicKey;
+            client.GetConnectionProtocol += GetConnectionProtocol;
+            client.CompareHMAC += CompareHMAC;
+            client.LeftChat += LeftChat;
+            client.MessageNotification += MessageNotification;
+            client.MessageCallBack += MessageCallBack;
+            client.MessageCallBackSigned += MessageCallBackSigned;
+            client.IncomingCall += IncomingCall;
+            client.CallAnswered += CallAnswered;
+            client.CallEnded += CallEnded;
+            client.ReceiveVoice += ReceiveVoice;
+            client.ReceiveVoiceKeys += ReceiveVoiceKeys;
+            try
+            {
+                client.Start();
+                ID = client.CreateUser(publicKey, mySignPublicKey);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Не удалось подключиться к серверу чата.\nСначала запустите ChatServer (http://localhost:5000).\n\n" + ex.Message,
+                    "Нет соединения",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
             state = State.NoSearch;
             ListViewMessage.Visibility = Visibility.Hidden;
             TextBoxMessage.Visibility = Visibility.Hidden;
@@ -87,6 +109,8 @@ namespace ChatClient
         }
         private void Find()
         {
+            if (client == null || !client.IsConnected || ID == -1)
+                return;
             client.Connect(ID);
         }
 
@@ -94,14 +118,15 @@ namespace ChatClient
         {
             Dispatcher.Invoke(() =>
             {
-                if (state == State.Found)
+                if (client != null && client.IsConnected && ID != -1)
                 {
-                    client.Disconnect(ID);
-                    state = State.NoSearch;
-                }
-                else
-                {
-                    client.Disconnect(ID);
+                    try
+                    {
+                        client.Disconnect(ID);
+                    }
+                    catch
+                    {
+                    }
                 }
 
                 LabelState.Content = "Состояние: Стандартное";
@@ -130,6 +155,7 @@ namespace ChatClient
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             DisconnectUser();
+            client?.Dispose();
         }
 
         public void GetConnectionAndPublicKey(byte[] publickey, byte[] signPublicKey)
