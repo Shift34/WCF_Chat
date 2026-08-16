@@ -15,7 +15,11 @@ namespace WCF_Chat
 
         public byte[] PublicKey { get; set; }
 
+        public byte[] SignPublicKey { get; set; }
+
         public IServerChatCallback Callback { get; set; }
+
+        public bool InCall { get; set; } = false;
 
     }
 }

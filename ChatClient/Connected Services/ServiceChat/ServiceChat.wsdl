@@ -53,6 +53,9 @@
   <wsdl:message name="IServiceChat_SendMessage_InputMessage">
     <wsdl:part name="parameters" element="tns:SendMessage" />
   </wsdl:message>
+  <wsdl:message name="IServiceChat_SendSignedMessage_InputMessage">
+    <wsdl:part name="parameters" element="tns:SendSignedMessage" />
+  </wsdl:message>
   <wsdl:message name="IServiceChat_SendMessageExit_InputMessage">
     <wsdl:part name="parameters" element="tns:SendMessageExit" />
   </wsdl:message>
@@ -62,8 +65,26 @@
   <wsdl:message name="IServiceChat_SendHashEquals_InputMessage">
     <wsdl:part name="parameters" element="tns:SendHashEquals" />
   </wsdl:message>
+  <wsdl:message name="IServiceChat_SendCallRequest_InputMessage">
+    <wsdl:part name="parameters" element="tns:SendCallRequest" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_SendCallAnswer_InputMessage">
+    <wsdl:part name="parameters" element="tns:SendCallAnswer" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_SendCallEnd_InputMessage">
+    <wsdl:part name="parameters" element="tns:SendCallEnd" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_RelayVoice_InputMessage">
+    <wsdl:part name="parameters" element="tns:RelayVoice" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_SendVoiceKeys_InputMessage">
+    <wsdl:part name="parameters" element="tns:SendVoiceKeys" />
+  </wsdl:message>
   <wsdl:message name="IServiceChat_MessageCallBack_OutputCallbackMessage">
     <wsdl:part name="parameters" element="tns:MessageCallBack" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_MessageCallBackSigned_OutputCallbackMessage">
+    <wsdl:part name="parameters" element="tns:MessageCallBackSigned" />
   </wsdl:message>
   <wsdl:message name="IServiceChat_GetConnectionAndPublicKey_OutputCallbackMessage">
     <wsdl:part name="parameters" element="tns:GetConnectionAndPublicKey" />
@@ -79,6 +100,21 @@
   </wsdl:message>
   <wsdl:message name="IServiceChat_MessageNotification_OutputCallbackMessage">
     <wsdl:part name="parameters" element="tns:MessageNotification" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_IncomingCall_OutputCallbackMessage">
+    <wsdl:part name="parameters" element="tns:IncomingCall" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_CallAnswered_OutputCallbackMessage">
+    <wsdl:part name="parameters" element="tns:CallAnswered" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_CallEnded_OutputCallbackMessage">
+    <wsdl:part name="parameters" element="tns:CallEnded" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_ReceiveVoice_OutputCallbackMessage">
+    <wsdl:part name="parameters" element="tns:ReceiveVoice" />
+  </wsdl:message>
+  <wsdl:message name="IServiceChat_ReceiveVoiceKeys_OutputCallbackMessage">
+    <wsdl:part name="parameters" element="tns:ReceiveVoiceKeys" />
   </wsdl:message>
   <wsdl:portType name="IServiceChat">
     <wsdl:operation name="CreateUser">
@@ -97,6 +133,9 @@
     <wsdl:operation name="SendMessage">
       <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendMessage" message="tns:IServiceChat_SendMessage_InputMessage" />
     </wsdl:operation>
+    <wsdl:operation name="SendSignedMessage">
+      <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendSignedMessage" message="tns:IServiceChat_SendSignedMessage_InputMessage" />
+    </wsdl:operation>
     <wsdl:operation name="SendMessageExit">
       <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendMessageExit" message="tns:IServiceChat_SendMessageExit_InputMessage" />
     </wsdl:operation>
@@ -106,8 +145,26 @@
     <wsdl:operation name="SendHashEquals">
       <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendHashEquals" message="tns:IServiceChat_SendHashEquals_InputMessage" />
     </wsdl:operation>
+    <wsdl:operation name="SendCallRequest">
+      <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendCallRequest" message="tns:IServiceChat_SendCallRequest_InputMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="SendCallAnswer">
+      <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendCallAnswer" message="tns:IServiceChat_SendCallAnswer_InputMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="SendCallEnd">
+      <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendCallEnd" message="tns:IServiceChat_SendCallEnd_InputMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="RelayVoice">
+      <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/RelayVoice" message="tns:IServiceChat_RelayVoice_InputMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="SendVoiceKeys">
+      <wsdl:input wsaw:Action="http://tempuri.org/IServiceChat/SendVoiceKeys" message="tns:IServiceChat_SendVoiceKeys_InputMessage" />
+    </wsdl:operation>
     <wsdl:operation name="MessageCallBack">
       <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/MessageCallBack" message="tns:IServiceChat_MessageCallBack_OutputCallbackMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="MessageCallBackSigned">
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/MessageCallBackSigned" message="tns:IServiceChat_MessageCallBackSigned_OutputCallbackMessage" />
     </wsdl:operation>
     <wsdl:operation name="GetConnectionAndPublicKey">
       <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/GetConnectionAndPublicKey" message="tns:IServiceChat_GetConnectionAndPublicKey_OutputCallbackMessage" />
@@ -123,6 +180,21 @@
     </wsdl:operation>
     <wsdl:operation name="MessageNotification">
       <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/MessageNotification" message="tns:IServiceChat_MessageNotification_OutputCallbackMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="IncomingCall">
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/IncomingCall" message="tns:IServiceChat_IncomingCall_OutputCallbackMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="CallAnswered">
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/CallAnswered" message="tns:IServiceChat_CallAnswered_OutputCallbackMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="CallEnded">
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/CallEnded" message="tns:IServiceChat_CallEnded_OutputCallbackMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="ReceiveVoice">
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/ReceiveVoice" message="tns:IServiceChat_ReceiveVoice_OutputCallbackMessage" />
+    </wsdl:operation>
+    <wsdl:operation name="ReceiveVoiceKeys">
+      <wsdl:output wsaw:Action="http://tempuri.org/IServiceChat/ReceiveVoiceKeys" message="tns:IServiceChat_ReceiveVoiceKeys_OutputCallbackMessage" />
     </wsdl:operation>
   </wsdl:portType>
   <wsdl:binding name="NetTcpBinding_IServiceChat" type="tns:IServiceChat">
@@ -161,6 +233,12 @@
         <soap12:body use="literal" />
       </wsdl:input>
     </wsdl:operation>
+    <wsdl:operation name="SendSignedMessage">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/SendSignedMessage" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+    </wsdl:operation>
     <wsdl:operation name="SendMessageExit">
       <soap12:operation soapAction="http://tempuri.org/IServiceChat/SendMessageExit" style="document" />
       <wsdl:input>
@@ -179,8 +257,44 @@
         <soap12:body use="literal" />
       </wsdl:input>
     </wsdl:operation>
+    <wsdl:operation name="SendCallRequest">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/SendCallRequest" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+    </wsdl:operation>
+    <wsdl:operation name="SendCallAnswer">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/SendCallAnswer" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+    </wsdl:operation>
+    <wsdl:operation name="SendCallEnd">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/SendCallEnd" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+    </wsdl:operation>
+    <wsdl:operation name="RelayVoice">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/RelayVoice" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+    </wsdl:operation>
+    <wsdl:operation name="SendVoiceKeys">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/SendVoiceKeys" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+    </wsdl:operation>
     <wsdl:operation name="MessageCallBack">
       <soap12:operation soapAction="http://tempuri.org/IServiceChat/MessageCallBack" style="document" />
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="MessageCallBackSigned">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/MessageCallBackSigned" style="document" />
       <wsdl:output>
         <soap12:body use="literal" />
       </wsdl:output>
@@ -215,6 +329,36 @@
         <soap12:body use="literal" />
       </wsdl:output>
     </wsdl:operation>
+    <wsdl:operation name="IncomingCall">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/IncomingCall" style="document" />
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="CallAnswered">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/CallAnswered" style="document" />
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="CallEnded">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/CallEnded" style="document" />
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ReceiveVoice">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/ReceiveVoice" style="document" />
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ReceiveVoiceKeys">
+      <soap12:operation soapAction="http://tempuri.org/IServiceChat/ReceiveVoiceKeys" style="document" />
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
   </wsdl:binding>
   <wsdl:service name="ServiceChat">
     <wsdl:port name="NetTcpBinding_IServiceChat" binding="tns:NetTcpBinding_IServiceChat">
@@ -222,7 +366,7 @@
       <wsa10:EndpointReference>
         <wsa10:Address>net.tcp://localhost:746/</wsa10:Address>
         <Identity xmlns="http://schemas.xmlsoap.org/ws/2006/02/addressingidentity">
-          <Upn>DESKTOP-2VVND8E\Матвей</Upn>
+          <Upn>MATTHEW\matve</Upn>
         </Identity>
       </wsa10:EndpointReference>
     </wsdl:port>

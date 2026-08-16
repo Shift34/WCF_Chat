@@ -16,10 +16,10 @@ namespace ChatClient.ServiceChat {
     public interface IServiceChat {
         
         [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/CreateUser", ReplyAction="http://tempuri.org/IServiceChat/CreateUserResponse")]
-        int CreateUser(byte[] publicKey);
+        int CreateUser(byte[] publicKey, byte[] signPublicKey);
         
         [System.ServiceModel.OperationContractAttribute(Action="http://tempuri.org/IServiceChat/CreateUser", ReplyAction="http://tempuri.org/IServiceChat/CreateUserResponse")]
-        System.Threading.Tasks.Task<int> CreateUserAsync(byte[] publicKey);
+        System.Threading.Tasks.Task<int> CreateUserAsync(byte[] publicKey, byte[] signPublicKey);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/Connect")]
         void Connect(int myID);
@@ -45,6 +45,12 @@ namespace ChatClient.ServiceChat {
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendMessage")]
         System.Threading.Tasks.Task SendMessageAsync(byte[] hmac, byte[] message, int identificator);
         
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendSignedMessage")]
+        void SendSignedMessage(byte[] hmac, byte[] message, byte[] signature, int identificator);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendSignedMessage")]
+        System.Threading.Tasks.Task SendSignedMessageAsync(byte[] hmac, byte[] message, byte[] signature, int identificator);
+        
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendMessageExit")]
         void SendMessageExit(string message, int identificator1);
         
@@ -62,6 +68,36 @@ namespace ChatClient.ServiceChat {
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendHashEquals")]
         System.Threading.Tasks.Task SendHashEqualsAsync(bool state, int id);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendCallRequest")]
+        void SendCallRequest(int userId, string callerIP, int callerPort);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendCallRequest")]
+        System.Threading.Tasks.Task SendCallRequestAsync(int userId, string callerIP, int callerPort);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendCallAnswer")]
+        void SendCallAnswer(int userId, bool accept, string answererIP, int answererPort);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendCallAnswer")]
+        System.Threading.Tasks.Task SendCallAnswerAsync(int userId, bool accept, string answererIP, int answererPort);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendCallEnd")]
+        void SendCallEnd(int userId);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendCallEnd")]
+        System.Threading.Tasks.Task SendCallEndAsync(int userId);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/RelayVoice")]
+        void RelayVoice(int fromUserId, byte[] voiceData);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/RelayVoice")]
+        System.Threading.Tasks.Task RelayVoiceAsync(int fromUserId, byte[] voiceData);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendVoiceKeys")]
+        void SendVoiceKeys(int fromUserId, byte[] sessionKey, byte[] iv);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/SendVoiceKeys")]
+        System.Threading.Tasks.Task SendVoiceKeysAsync(int fromUserId, byte[] sessionKey, byte[] iv);
     }
     
     [System.CodeDom.Compiler.GeneratedCodeAttribute("System.ServiceModel", "4.0.0.0")]
@@ -70,8 +106,11 @@ namespace ChatClient.ServiceChat {
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/MessageCallBack")]
         void MessageCallBack(byte[] hmac, string message, byte[] bytes);
         
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/MessageCallBackSigned")]
+        void MessageCallBackSigned(byte[] hmac, string message, byte[] bytes, byte[] signature);
+        
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/GetConnectionAndPublicKey")]
-        void GetConnectionAndPublicKey(byte[] publickey);
+        void GetConnectionAndPublicKey(byte[] publickey, byte[] signPublicKey);
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/LeftChat")]
         void LeftChat();
@@ -84,6 +123,21 @@ namespace ChatClient.ServiceChat {
         
         [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/MessageNotification")]
         void MessageNotification(string message);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/IncomingCall")]
+        void IncomingCall(int fromUserId, string callerIP, int callerPort);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/CallAnswered")]
+        void CallAnswered(int fromUserId, bool accept, string answererIP, int answererPort);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/CallEnded")]
+        void CallEnded(int fromUserId);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/ReceiveVoice")]
+        void ReceiveVoice(int fromUserId, byte[] voiceData);
+        
+        [System.ServiceModel.OperationContractAttribute(IsOneWay=true, Action="http://tempuri.org/IServiceChat/ReceiveVoiceKeys")]
+        void ReceiveVoiceKeys(int fromUserId, byte[] sessionKey, byte[] iv);
     }
     
     [System.CodeDom.Compiler.GeneratedCodeAttribute("System.ServiceModel", "4.0.0.0")]
@@ -114,12 +168,12 @@ namespace ChatClient.ServiceChat {
                 base(callbackInstance, binding, remoteAddress) {
         }
         
-        public int CreateUser(byte[] publicKey) {
-            return base.Channel.CreateUser(publicKey);
+        public int CreateUser(byte[] publicKey, byte[] signPublicKey) {
+            return base.Channel.CreateUser(publicKey, signPublicKey);
         }
         
-        public System.Threading.Tasks.Task<int> CreateUserAsync(byte[] publicKey) {
-            return base.Channel.CreateUserAsync(publicKey);
+        public System.Threading.Tasks.Task<int> CreateUserAsync(byte[] publicKey, byte[] signPublicKey) {
+            return base.Channel.CreateUserAsync(publicKey, signPublicKey);
         }
         
         public void Connect(int myID) {
@@ -154,6 +208,14 @@ namespace ChatClient.ServiceChat {
             return base.Channel.SendMessageAsync(hmac, message, identificator);
         }
         
+        public void SendSignedMessage(byte[] hmac, byte[] message, byte[] signature, int identificator) {
+            base.Channel.SendSignedMessage(hmac, message, signature, identificator);
+        }
+        
+        public System.Threading.Tasks.Task SendSignedMessageAsync(byte[] hmac, byte[] message, byte[] signature, int identificator) {
+            return base.Channel.SendSignedMessageAsync(hmac, message, signature, identificator);
+        }
+        
         public void SendMessageExit(string message, int identificator1) {
             base.Channel.SendMessageExit(message, identificator1);
         }
@@ -176,6 +238,46 @@ namespace ChatClient.ServiceChat {
         
         public System.Threading.Tasks.Task SendHashEqualsAsync(bool state, int id) {
             return base.Channel.SendHashEqualsAsync(state, id);
+        }
+        
+        public void SendCallRequest(int userId, string callerIP, int callerPort) {
+            base.Channel.SendCallRequest(userId, callerIP, callerPort);
+        }
+        
+        public System.Threading.Tasks.Task SendCallRequestAsync(int userId, string callerIP, int callerPort) {
+            return base.Channel.SendCallRequestAsync(userId, callerIP, callerPort);
+        }
+        
+        public void SendCallAnswer(int userId, bool accept, string answererIP, int answererPort) {
+            base.Channel.SendCallAnswer(userId, accept, answererIP, answererPort);
+        }
+        
+        public System.Threading.Tasks.Task SendCallAnswerAsync(int userId, bool accept, string answererIP, int answererPort) {
+            return base.Channel.SendCallAnswerAsync(userId, accept, answererIP, answererPort);
+        }
+        
+        public void SendCallEnd(int userId) {
+            base.Channel.SendCallEnd(userId);
+        }
+        
+        public System.Threading.Tasks.Task SendCallEndAsync(int userId) {
+            return base.Channel.SendCallEndAsync(userId);
+        }
+        
+        public void RelayVoice(int fromUserId, byte[] voiceData) {
+            base.Channel.RelayVoice(fromUserId, voiceData);
+        }
+        
+        public System.Threading.Tasks.Task RelayVoiceAsync(int fromUserId, byte[] voiceData) {
+            return base.Channel.RelayVoiceAsync(fromUserId, voiceData);
+        }
+        
+        public void SendVoiceKeys(int fromUserId, byte[] sessionKey, byte[] iv) {
+            base.Channel.SendVoiceKeys(fromUserId, sessionKey, iv);
+        }
+        
+        public System.Threading.Tasks.Task SendVoiceKeysAsync(int fromUserId, byte[] sessionKey, byte[] iv) {
+            return base.Channel.SendVoiceKeysAsync(fromUserId, sessionKey, iv);
         }
     }
 }

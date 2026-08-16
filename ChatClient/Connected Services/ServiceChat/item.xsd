@@ -4,6 +4,7 @@
     <xs:complexType>
       <xs:sequence>
         <xs:element minOccurs="0" name="publicKey" nillable="true" type="xs:base64Binary" />
+        <xs:element minOccurs="0" name="signPublicKey" nillable="true" type="xs:base64Binary" />
       </xs:sequence>
     </xs:complexType>
   </xs:element>
@@ -44,6 +45,16 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
+  <xs:element name="SendSignedMessage">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="hmac" nillable="true" type="xs:base64Binary" />
+        <xs:element minOccurs="0" name="message" nillable="true" type="xs:base64Binary" />
+        <xs:element minOccurs="0" name="signature" nillable="true" type="xs:base64Binary" />
+        <xs:element minOccurs="0" name="identificator" type="xs:int" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
   <xs:element name="SendMessageExit">
     <xs:complexType>
       <xs:sequence>
@@ -69,6 +80,49 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
+  <xs:element name="SendCallRequest">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="userId" type="xs:int" />
+        <xs:element minOccurs="0" name="callerIP" nillable="true" type="xs:string" />
+        <xs:element minOccurs="0" name="callerPort" type="xs:int" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="SendCallAnswer">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="userId" type="xs:int" />
+        <xs:element minOccurs="0" name="accept" type="xs:boolean" />
+        <xs:element minOccurs="0" name="answererIP" nillable="true" type="xs:string" />
+        <xs:element minOccurs="0" name="answererPort" type="xs:int" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="SendCallEnd">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="userId" type="xs:int" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="RelayVoice">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="fromUserId" type="xs:int" />
+        <xs:element minOccurs="0" name="voiceData" nillable="true" type="xs:base64Binary" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="SendVoiceKeys">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="fromUserId" type="xs:int" />
+        <xs:element minOccurs="0" name="sessionKey" nillable="true" type="xs:base64Binary" />
+        <xs:element minOccurs="0" name="iv" nillable="true" type="xs:base64Binary" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
   <xs:element name="MessageCallBack">
     <xs:complexType>
       <xs:sequence>
@@ -78,10 +132,21 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
+  <xs:element name="MessageCallBackSigned">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="hmac" nillable="true" type="xs:base64Binary" />
+        <xs:element minOccurs="0" name="message" nillable="true" type="xs:string" />
+        <xs:element minOccurs="0" name="bytes" nillable="true" type="xs:base64Binary" />
+        <xs:element minOccurs="0" name="signature" nillable="true" type="xs:base64Binary" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
   <xs:element name="GetConnectionAndPublicKey">
     <xs:complexType>
       <xs:sequence>
         <xs:element minOccurs="0" name="publickey" nillable="true" type="xs:base64Binary" />
+        <xs:element minOccurs="0" name="signPublicKey" nillable="true" type="xs:base64Binary" />
       </xs:sequence>
     </xs:complexType>
   </xs:element>
@@ -109,6 +174,49 @@
     <xs:complexType>
       <xs:sequence>
         <xs:element minOccurs="0" name="message" nillable="true" type="xs:string" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="IncomingCall">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="fromUserId" type="xs:int" />
+        <xs:element minOccurs="0" name="callerIP" nillable="true" type="xs:string" />
+        <xs:element minOccurs="0" name="callerPort" type="xs:int" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CallAnswered">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="fromUserId" type="xs:int" />
+        <xs:element minOccurs="0" name="accept" type="xs:boolean" />
+        <xs:element minOccurs="0" name="answererIP" nillable="true" type="xs:string" />
+        <xs:element minOccurs="0" name="answererPort" type="xs:int" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CallEnded">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="fromUserId" type="xs:int" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ReceiveVoice">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="fromUserId" type="xs:int" />
+        <xs:element minOccurs="0" name="voiceData" nillable="true" type="xs:base64Binary" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ReceiveVoiceKeys">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="fromUserId" type="xs:int" />
+        <xs:element minOccurs="0" name="sessionKey" nillable="true" type="xs:base64Binary" />
+        <xs:element minOccurs="0" name="iv" nillable="true" type="xs:base64Binary" />
       </xs:sequence>
     </xs:complexType>
   </xs:element>

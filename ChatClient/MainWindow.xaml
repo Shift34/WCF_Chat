@@ -11,7 +11,48 @@
         AllowsTransparency="true"
         ResizeMode="CanResizeWithGrip"
         Title="MainWindow" Loaded="Window_Loaded" Closing="Window_Closing">
+
     <Window.Resources>
+        <!-- Конвертер выравнивания -->
+        <local:BooleanToAlignmentConverter x:Key="BooleanToAlignmentConverter"/>
+
+        <!-- Конвертер цветов сообщений -->
+        <local:OwnMessageColorConverter x:Key="OwnMessageColorConverter"/>
+
+        <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <local:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+
+        <!-- Стиль для кнопки звонка -->
+        <Style x:Key="CallButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#23a559"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" 
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#2dbd66"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#1a7a3f"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Стиль для TextBox в стиле Discord -->
         <Style x:Key="DiscordTextBoxStyle" TargetType="TextBox">
             <Setter Property="Background" Value="#40444B"/>
@@ -30,41 +71,31 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
                         <Grid>
-                            <!-- Фон с скругленными углами -->
                             <Border x:Name="border" 
-                        Background="{TemplateBinding Background}"
-                        CornerRadius="8"
-                        BorderThickness="1"
-                        BorderBrush="#00000000"
-                        SnapsToDevicePixels="True">
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="8"
+                                    BorderThickness="1"
+                                    BorderBrush="#00000000"
+                                    SnapsToDevicePixels="True">
                                 <ScrollViewer x:Name="PART_ContentHost"
-                                
-                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                             </Border>
-
-                            <!-- Плейсхолдер -->
                             <TextBlock x:Name="placeholderText"
-                          Text="Написать сообщение..."
-                          Foreground="#72767D"
-                          Margin="18,8,15,8"
-                          FontSize="15"             
-                          VerticalAlignment="Center"
-                          IsHitTestVisible="False"
-                          Visibility="Collapsed"/>
+                                       Text="Написать сообщение..."
+                                       Foreground="#72767D"
+                                       Margin="18,8,15,8"
+                                       FontSize="15"             
+                                       VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       Visibility="Collapsed"/>
                         </Grid>
-
                         <ControlTemplate.Triggers>
-                            <!-- Показывать плейсхолдер когда текст пустой -->
                             <Trigger Property="Text" Value="">
                                 <Setter TargetName="placeholderText" Property="Visibility" Value="Visible"/>
                             </Trigger>
-
-                            <!-- Эффект при фокусе -->
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="border" Property="BorderBrush" Value="#383C43"/>
                             </Trigger>
-
-                            <!-- Эффект при наведении -->
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="border" Property="Background" Value="#383C43"/>
                             </Trigger>
@@ -73,18 +104,102 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="ModernSliderStyle" TargetType="Slider">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Width" Value="180"/>
+            <Setter Property="Minimum" Value="0"/>
+            <Setter Property="Maximum" Value="100"/>
+            <Setter Property="IsSnapToTickEnabled" Value="False"/>
+            <Setter Property="TickFrequency" Value="10"/>
+            <Setter Property="AutoToolTipPlacement" Value="BottomRight"/>
+            <Setter Property="Foreground" Value="#23a559"/>
+            <Setter Property="Background" Value="#40444b"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Height="30">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Иконка -->
+                            <TextBlock x:Name="VolumeIcon" 
+                                   Grid.Column="0"
+                                   Text="🔊" 
+                                   FontSize="12"
+                                   Foreground="#23a559"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+
+                            <!-- Дорожка -->
+                            <Grid Grid.Column="1" VerticalAlignment="Center">
+                                <Border Height="4" 
+                                    Background="#40444b" 
+                                    CornerRadius="2"/>
+                                <Border x:Name="TrackBackground" 
+                                    Height="4" 
+                                    Background="#23a559" 
+                                    CornerRadius="2"
+                                    HorizontalAlignment="Left"
+                                    Width="0"/>
+                                <Thumb x:Name="Thumb" 
+                                   Width="12" Height="12"
+                                   Background="#23a559"
+                                   BorderBrush="White"
+                                   BorderThickness="2"
+                                   Cursor="Hand">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="6"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Grid>
+
+                            <!-- Значение -->
+                            <TextBlock x:Name="ValueText" 
+                                   Grid.Column="2"
+                                   Text="100%" 
+                                   FontSize="10"
+                                   Foreground="#B9BBBE"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Value" Value="0">
+                                <Setter TargetName="VolumeIcon" Property="Text" Value="🔇"/>
+                            </Trigger>
+                            <Trigger Property="Value" Value="30">
+                                <Setter TargetName="VolumeIcon" Property="Text" Value="🔈"/>
+                            </Trigger>
+                            <Trigger Property="Value" Value="70">
+                                <Setter TargetName="VolumeIcon" Property="Text" Value="🔉"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
+
     <Grid x:Name="Grid">
         <Grid.RowDefinitions>
             <RowDefinition Height="25"/>
             <RowDefinition Height="75"/>
-            <RowDefinition />
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
             <RowDefinition Height="75"/>
         </Grid.RowDefinitions>
-        <Border Grid.ColumnSpan="2"
+
+        <!-- Заголовок -->
+        <Border Grid.Row="0" Grid.ColumnSpan="2"
                 Background="#252525"
                 MouseDown="Border_MouseDown">
-
             <Grid HorizontalAlignment="Stretch">
                 <Label Content="Anonumous Chat"
                        Foreground="Gray"
@@ -116,8 +231,9 @@
                 </StackPanel>
             </Grid>
         </Border>
-        <Grid Background="#36393f"
-              Grid.Row="1">
+
+        <!-- Статус и кнопка поиска -->
+        <Grid Background="#36393f" Grid.Row="1">
             <Grid HorizontalAlignment="Stretch">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="33*"/>
@@ -126,72 +242,440 @@
                 </Grid.ColumnDefinitions>
 
                 <Label x:Name="LabelState" 
-                   Grid.Column="0"
-                   Content="Состояние: Стандартное"
-                   HorizontalContentAlignment="Center" 
-                   VerticalContentAlignment="Center"
-                   Height="75"
-                   Foreground="LawnGreen"
-                   FontWeight="SemiBold" 
-                   FontFamily="Arial"/>
+                       Grid.Column="0"
+                       Content="Состояние: Стандартное"
+                       HorizontalContentAlignment="Center" 
+                       VerticalContentAlignment="Center"
+                       Height="75"
+                       Foreground="LawnGreen"
+                       FontWeight="SemiBold" 
+                       FontFamily="Arial"/>
 
-                <!-- Центральная панель (40%) -->
                 <StackPanel Grid.Column="1"
-                    HorizontalAlignment="Stretch" 
-                    Height="75">
+                            HorizontalAlignment="Stretch" 
+                            Height="75">
                     <Button x:Name="Button1" 
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        Height="75"  
-                        Content="Найти собеседника"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Foreground="NavajoWhite"
-                        FontWeight="Bold"
-                        Click="ButtonFindAndCancelAndDisconnect_Click" 
-                        FontSize="16" 
-                        FontFamily="Arial"/>
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Height="75"  
+                            Content="Найти собеседника"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="NavajoWhite"
+                            FontWeight="Bold"
+                            Click="ButtonFindAndCancelAndDisconnect_Click" 
+                            FontSize="16" 
+                            FontFamily="Arial"/>
                 </StackPanel>
 
-                <!-- Правая метка (30%) -->
                 <Label x:Name="LabelTypeEncryption" 
-                   Grid.Column="2"
-                   Content="Протокол Signal"
-                   HorizontalContentAlignment="Center" 
-                   VerticalContentAlignment="Center"
-                   Height="75"
-                   Foreground="FloralWhite"
-                   FontWeight="SemiBold" 
-                   FontFamily="Arial"/>
+                       Grid.Column="2"
+                       Content="Протокол Signal"
+                       HorizontalContentAlignment="Center" 
+                       VerticalContentAlignment="Center"
+                       Height="75"
+                       Foreground="FloralWhite"
+                       FontWeight="SemiBold" 
+                       FontFamily="Arial"/>
             </Grid>
         </Grid>
-        <Grid Background="#36393f"
-              Grid.Row="2">
-            <ListView x:Name="ListViewMessage" Margin="8,0,0,0"
+
+        <!-- Панель звонка (над сообщениями) -->
+        <Border x:Name="CallPanel" 
+        Grid.Row="2"
+        Background="#2f3136"
+        BorderThickness="0,0,0,1"
+        BorderBrush="#202225"
+        Height="60"
+        Visibility="Collapsed">
+
+            <!-- ОБЕРТКА: один корневой элемент для Border -->
+            <Grid>
+                <!-- РЕЖИМ 1: ТОЛЬКО КНОПКА "ПОЗВОНИТЬ" -->
+                <Grid x:Name="IdleMode" 
+              Margin="12,8"
+              Visibility="Visible">
+
+                    <Button x:Name="CallButton" 
+                    Content="📞 Позвонить"
+                    Background="#23a559"
+                    Foreground="White"
+                    BorderThickness="0"
+                    Padding="20,10"
+                    Cursor="Hand"
+                    FontSize="14"
+                    FontWeight="SemiBold"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Click="CallButton_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                                CornerRadius="20"
+                                Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter HorizontalAlignment="Center" 
+                                              VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+
+                <!-- РЕЖИМ 2: АКТИВНЫЙ ЗВОНОК (два кружка + кнопки) -->
+                <Grid x:Name="ActiveMode" 
+      Margin="12,8"
+      Visibility="Collapsed">
+
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- 0: свой аватар -->
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- 1: свой статус -->
+                        <ColumnDefinition Width="*"/>
+                        <!-- 2: кнопки управления -->
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- 3: статус собеседника -->
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- 4: аватар собеседника -->
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Левый круг (свой аватар) - колонка 0 -->
+                    <Border x:Name="MyAvatarBorder" 
+            Grid.Column="0"
+            Width="56" Height="56"
+            CornerRadius="28"
+            Background="#40444b"
+            Margin="0,0,12,0">
+                        <Grid>
+                            <Border x:Name="MyGlowBorder" 
+                    Width="62" Height="62"
+                    CornerRadius="31"
+                    Background="Transparent"
+                    BorderThickness="3"
+                    BorderBrush="#23a559"
+                    Opacity="0"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsHitTestVisible="False">
+                                <Border.RenderTransform>
+                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                </Border.RenderTransform>
+                            </Border>
+                            <TextBlock x:Name="MyAvatarIcon" 
+                       Text="🎤" 
+                       FontSize="28" 
+                       HorizontalAlignment="Center" 
+                       VerticalAlignment="Center"
+                       Foreground="White"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Свой статус (ВЫ) - колонка 1 -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <TextBlock Text="ВЫ" 
+                   Foreground="#B9BBBE"
+                   FontSize="11"
+                   Margin="0,0,0,2"/>
+                        <TextBlock x:Name="MyStatusText" 
+                   Text="● Готов"
+                   Foreground="#23a559"
+                   FontSize="12"/>
+                    </StackPanel>
+
+                    <!-- Центральная часть: кнопки управления - колонка 2 -->
+                    <StackPanel Grid.Column="2" 
+                HorizontalAlignment="Center" 
+                VerticalAlignment="Center"
+                Orientation="Horizontal">
+
+                        <Button x:Name="MuteButton" 
+                Width="40" Height="40"
+                Content="🎤"
+                Background="#4f545c"
+                Foreground="White"
+                BorderThickness="0"
+                Cursor="Hand"
+                Margin="10"
+                Click="MuteButton_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="20"
+                            Padding="10">
+                                        <ContentPresenter HorizontalAlignment="Center" 
+                                          VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <Button x:Name="EndCallButton" 
+                Width="40" Height="40"
+                Content="🔴"
+                Background="#da373c"
+                Foreground="White"
+                BorderThickness="0"
+                Cursor="Hand"
+                Margin="10"
+                Click="EndCallButton_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="20"
+                            Padding="10">
+                                        <ContentPresenter HorizontalAlignment="Center" 
+                                          VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Статус собеседника - колонка 3 -->
+                    <StackPanel Grid.Column="3" 
+                                VerticalAlignment="Center" 
+                                Margin="12,0,12,0"
+                                HorizontalAlignment="Right">
+                        <!-- ← Добавить -->
+                        <TextBlock x:Name="PeerNameText" 
+                                   Text="Собеседник"
+                                   Foreground="White"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Right"/>
+                        <TextBlock x:Name="PeerVoiceStatus" 
+                                   Text=""
+                                   Foreground="#23a559"
+                                   FontSize="11"
+                                   HorizontalAlignment="Right"/>
+                        <!-- ← Добавить -->
+                    </StackPanel>
+
+                    <!-- Правый круг (аватар собеседника) - колонка 4 -->
+                    <Border x:Name="PeerAvatarBorder" 
+            Grid.Column="4"
+            Width="56" Height="56"
+            CornerRadius="28"
+            Background="#40444b"
+            Margin="12,0,0,0"
+            Cursor="Hand"
+            MouseRightButtonUp="PeerAvatar_MouseRightButtonUp">
+                        <Grid>
+                            <Border x:Name="PeerGlowBorder" 
+                    Width="62" Height="62"
+                    CornerRadius="31"
+                    Background="Transparent"
+                    BorderThickness="3"
+                    BorderBrush="#23a559"
+                    Opacity="0"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsHitTestVisible="False">
+                                <Border.RenderTransform>
+                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                </Border.RenderTransform>
+                            </Border>
+                            <TextBlock x:Name="PeerAvatarIcon" 
+                       Text="👤" 
+                       FontSize="28" 
+                       HorizontalAlignment="Center" 
+                       VerticalAlignment="Center"
+                       Foreground="White"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Список сообщений -->
+        <Grid Background="#36393f" Grid.Row="3">
+            <ListView x:Name="ListViewMessage" 
+                      Margin="8,0,0,0"
+                      Padding="8,0,0,0"
                       Background="Transparent"
                       BorderThickness="0"
-                      Foreground="Gray" FontSize="18" FontFamily="Arial">
+                      ScrollViewer.VerticalScrollBarVisibility="Visible"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                      VirtualizingPanel.ScrollUnit="Pixel"
+                      VirtualizingPanel.IsVirtualizing="True">
 
+                <ListView.Resources>
+
+                    <!-- ScrollBar стиль -->
+                    <Style TargetType="ScrollBar">
+                        <Setter Property="Width" Value="8"/>
+                        <Setter Property="Opacity" Value="0"/>
+                        <Setter Property="Background" Value="Transparent"/>
+
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ScrollBar">
+                                    <Grid Background="Transparent">
+                                        <Track Name="PART_Track">
+
+                                            <!-- УБРАНЫ кнопки -->
+                                            <Track.DecreaseRepeatButton>
+                                                <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0"/>
+                                            </Track.DecreaseRepeatButton>
+                                            <Track.IncreaseRepeatButton>
+                                                <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0"/>
+                                            </Track.IncreaseRepeatButton>
+
+                                            <!-- Сам ползунок -->
+
+                                            <Track.Thumb>
+                                                <Thumb>
+                                                    <Thumb.Template>
+                                                        <ControlTemplate TargetType="Thumb">
+                                                            <Border x:Name="ThumbBorder"
+                                                                    Background="#2F3136"
+                                                                    CornerRadius="4"
+                                                                    Opacity="0.3"/>
+
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="ThumbBorder" Property="Opacity" Value="0.8"/>
+                                                                    <Setter TargetName="ThumbBorder" Property="Background" Value="#5865F2"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsDragging" Value="True">
+                                                                    <Setter TargetName="ThumbBorder" Property="Opacity" Value="1"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Thumb.Template>
+                                                </Thumb>
+                                            </Track.Thumb>
+
+                                        </Track>
+                                    </Grid>
+
+                                    <!-- Появляется только при наведении -->
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="False">
+                                            <Setter Property="Opacity" Value="0"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                </ListView.Resources>
+
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0,4"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Focusable" Value="False"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListViewItem">
+                                    <ContentPresenter Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Stretch"/>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListView.ItemContainerStyle>
+
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel>
+                            <!-- Системное сообщение (по центру) -->
+                            <Grid Margin="0,10" 
+                          Visibility="{Binding IsSystemMessage, 
+                              Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Border Background="#40444B"
+                                CornerRadius="15"
+                                Padding="15,8"
+                                HorizontalAlignment="Center"
+                                MaxWidth="400">
+                                    <TextBlock Text="{Binding Text}"
+                                       Foreground="#AAAAAA"
+                                       FontSize="12"
+                                       FontStyle="Italic"
+                                       HorizontalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+
+                            <!-- Обычное сообщение -->
+                            <Grid Margin="0,2" 
+                          Visibility="{Binding IsSystemMessage, 
+                              Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                <Grid HorizontalAlignment="{Binding IsOwnMessage, 
+                            Converter={StaticResource BooleanToAlignmentConverter}}">
+
+                                    <Border CornerRadius="12"
+                                    Background="{Binding IsOwnMessage, 
+                                        Converter={StaticResource OwnMessageColorConverter}}"
+                                    MaxWidth="350"
+                                    Padding="10,6">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Text}"
+                                               TextWrapping="Wrap"
+                                               Foreground="White"
+                                               FontSize="14"/>
+
+                                            <StackPanel Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                Margin="0,4,0,0">
+                                                <TextBlock Text="{Binding Time}"
+                                                   FontSize="10"
+                                                   Foreground="#CCCCCC"
+                                                   Margin="0,0,5,0"/>
+                                                <TextBlock Text="{Binding StatusIcon}"
+                                                   FontSize="10"
+                                                   Foreground="{Binding StatusColor}"
+                                                   Visibility="{Binding IsOwnMessage, 
+                                                       Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
             </ListView>
         </Grid>
-        <Grid Background="#36393f"
-              Grid.Row="3">
+
+        <!-- Поле ввода -->
+        <Grid Background="#36393f" Grid.Row="4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
             </Grid.ColumnDefinitions>
-            <Border Grid.Row="1" 
-                Background="#36393F" 
-                Padding="16,0,16,16">
+            <Border Background="#36393F" 
+                    Padding="16,0,16,16">
                 <Grid>
-                    
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-
-                    <!-- Текстовое поле -->
                     <TextBox x:Name="TextBoxMessage"
-                        Style="{StaticResource DiscordTextBoxStyle}"
-                        PreviewKeyDown="TextBox_PreviewKeyDown"/>
+                             Style="{StaticResource DiscordTextBoxStyle}"
+                             PreviewKeyDown="TextBox_PreviewKeyDown"/>
                 </Grid>
             </Border>
         </Grid>

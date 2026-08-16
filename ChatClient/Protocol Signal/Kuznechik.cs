@@ -3,6 +3,127 @@ using System.Text;
 
 namespace ChatClient.ProtocolSignal
 {
+    public class KuznechikStreaming : IDisposable
+    {
+        private Kuznechik _kuznechik;
+        private byte[] _counter;
+        private byte[] _masterKey;
+        private readonly object _lockObj = new object();
+        private byte[] _gammaBuffer;
+        private int _gammaBufferOffset;
+
+        public KuznechikStreaming(byte[] key)
+        {
+            if (key.Length != 32)
+                throw new ArgumentException("Ключ должен быть 32 байта (256 бит)");
+
+            _masterKey = new byte[32];
+            Array.Copy(key, _masterKey, 32);
+            _kuznechik = new Kuznechik();
+            _counter = new byte[16];
+            _gammaBuffer = new byte[65536]; // 64 KB буфер гаммы
+            _gammaBufferOffset = 0;
+        }
+
+        public void InitSession(byte[] iv)
+        {
+            if (iv.Length != 16)
+                throw new ArgumentException("IV должен быть 16 байт");
+
+            lock (_lockObj)
+            {
+                Array.Copy(iv, _counter, 16);
+                _gammaBufferOffset = 0;
+            }
+        }
+
+        public void UpdateKey(byte[] newKey, byte[] newIV)
+        {
+            lock (_lockObj)
+            {
+                Array.Copy(newKey, _masterKey, 32);
+                Array.Copy(newIV, _counter, 16);
+                _gammaBufferOffset = 0;
+                Array.Clear(_gammaBuffer, 0, _gammaBuffer.Length);
+            }
+        }
+
+        public byte[] EncryptVoiceFast(byte[] voiceData, int offset, int length)
+        {
+            if (voiceData == null || length == 0)
+                return new byte[0];
+
+            byte[] result = new byte[length];
+
+            lock (_lockObj)
+            {
+                int processed = 0;
+                while (processed < length)
+                {
+                    // Если буфер гаммы пуст, генерируем новую порцию
+                    if (_gammaBufferOffset >= _gammaBuffer.Length)
+                    {
+                        GenerateGammaBuffer();
+                    }
+
+                    int blockSize = Math.Min(length - processed, _gammaBuffer.Length - _gammaBufferOffset);
+
+                    // Накладываем гамму
+                    for (int i = 0; i < blockSize; i++)
+                    {
+                        result[processed + i] = (byte)(voiceData[offset + processed + i] ^ _gammaBuffer[_gammaBufferOffset + i]);
+                    }
+
+                    processed += blockSize;
+                    _gammaBufferOffset += blockSize;
+                }
+            }
+
+            return result;
+        }
+
+        public byte[] DecryptVoiceFast(byte[] encryptedData)
+        {
+            // В режиме CTR дешифрование = шифрованию
+            return EncryptVoiceFast(encryptedData, 0, encryptedData.Length);
+        }
+
+        private void GenerateGammaBuffer()
+        {
+            int blocksCount = _gammaBuffer.Length / 16;
+            byte[] tempCounter = new byte[16];
+            Array.Copy(_counter, tempCounter, 16);
+
+            for (int i = 0; i < blocksCount; i++)
+            {
+                byte[] encryptedCounter = _kuznechik.KuzEncript(tempCounter, _masterKey);
+                Array.Copy(encryptedCounter, 0, _gammaBuffer, i * 16, 16);
+
+                // Инкрементируем временный счетчик
+                for (int j = 15; j >= 0; j--)
+                {
+                    tempCounter[j]++;
+                    if (tempCounter[j] != 0)
+                        break;
+                }
+            }
+
+            // Обновляем основной счетчик
+            Array.Copy(tempCounter, _counter, 16);
+            _gammaBufferOffset = 0;
+        }
+
+        public void Dispose()
+        {
+            if (_counter != null)
+                Array.Clear(_counter, 0, _counter.Length);
+            if (_masterKey != null)
+                Array.Clear(_masterKey, 0, _masterKey.Length);
+            if (_gammaBuffer != null)
+                Array.Clear(_gammaBuffer, 0, _gammaBuffer.Length);
+        }
+    }
+
     class Kuznechik
     {
 
