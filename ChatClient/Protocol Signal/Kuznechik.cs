@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Text;
+using System.Security.Cryptography;
 
 namespace ChatClient.ProtocolSignal
 {
@@ -14,102 +14,109 @@ namespace ChatClient.ProtocolSignal
 
         public KuznechikStreaming(byte[] key)
         {
+            if (key == null)
+                throw new ArgumentNullException(nameof(key));
             if (key.Length != 32)
-                throw new ArgumentException("Ключ должен быть 32 байта (256 бит)");
+                throw new ArgumentException("Ключ должен быть 32 байта (256 бит)", nameof(key));
 
             _masterKey = new byte[32];
             Array.Copy(key, _masterKey, 32);
             _kuznechik = new Kuznechik();
             _counter = new byte[16];
-            _gammaBuffer = new byte[65536]; // 64 KB буфер гаммы
-            _gammaBufferOffset = 0;
+            _gammaBuffer = new byte[16];
+            _gammaBufferOffset = 16;
         }
 
         public void InitSession(byte[] iv)
         {
-            if (iv.Length != 16)
-                throw new ArgumentException("IV должен быть 16 байт");
+            if (iv == null)
+                throw new ArgumentNullException(nameof(iv));
+            if (iv.Length != 8 && iv.Length != 16)
+                throw new ArgumentException("IV должен быть 8 или 16 байт", nameof(iv));
 
             lock (_lockObj)
             {
-                Array.Copy(iv, _counter, 16);
-                _gammaBufferOffset = 0;
+                Array.Clear(_counter, 0, _counter.Length);
+                Array.Copy(iv, _counter, iv.Length);
+                _gammaBufferOffset = 16;
             }
         }
 
         public void UpdateKey(byte[] newKey, byte[] newIV)
         {
+            if (newKey == null)
+                throw new ArgumentNullException(nameof(newKey));
+            if (newKey.Length != 32)
+                throw new ArgumentException("Ключ должен быть 32 байта (256 бит)", nameof(newKey));
+            if (newIV == null)
+                throw new ArgumentNullException(nameof(newIV));
+            if (newIV.Length != 8 && newIV.Length != 16)
+                throw new ArgumentException("IV должен быть 8 или 16 байт", nameof(newIV));
+
             lock (_lockObj)
             {
                 Array.Copy(newKey, _masterKey, 32);
-                Array.Copy(newIV, _counter, 16);
-                _gammaBufferOffset = 0;
-                Array.Clear(_gammaBuffer, 0, _gammaBuffer.Length);
+                Array.Clear(_counter, 0, _counter.Length);
+                Array.Copy(newIV, _counter, newIV.Length);
+                _gammaBufferOffset = 16;
             }
         }
 
         public byte[] EncryptVoiceFast(byte[] voiceData, int offset, int length)
         {
             if (voiceData == null || length == 0)
-                return new byte[0];
+                return Array.Empty<byte>();
 
             byte[] result = new byte[length];
-
-            lock (_lockObj)
-            {
-                int processed = 0;
-                while (processed < length)
-                {
-                    // Если буфер гаммы пуст, генерируем новую порцию
-                    if (_gammaBufferOffset >= _gammaBuffer.Length)
-                    {
-                        GenerateGammaBuffer();
-                    }
-
-                    int blockSize = Math.Min(length - processed, _gammaBuffer.Length - _gammaBufferOffset);
-
-                    // Накладываем гамму
-                    for (int i = 0; i < blockSize; i++)
-                    {
-                        result[processed + i] = (byte)(voiceData[offset + processed + i] ^ _gammaBuffer[_gammaBufferOffset + i]);
-                    }
-
-                    processed += blockSize;
-                    _gammaBufferOffset += blockSize;
-                }
-            }
-
+            Xor(voiceData, offset, result, 0, length);
             return result;
         }
 
         public byte[] DecryptVoiceFast(byte[] encryptedData)
         {
-            // В режиме CTR дешифрование = шифрованию
             return EncryptVoiceFast(encryptedData, 0, encryptedData.Length);
         }
 
-        private void GenerateGammaBuffer()
+        public void Xor(byte[] source, int sourceOffset, byte[] destination, int destinationOffset, int length)
         {
-            int blocksCount = _gammaBuffer.Length / 16;
-            byte[] tempCounter = new byte[16];
-            Array.Copy(_counter, tempCounter, 16);
-
-            for (int i = 0; i < blocksCount; i++)
+            lock (_lockObj)
             {
-                byte[] encryptedCounter = _kuznechik.KuzEncript(tempCounter, _masterKey);
-                Array.Copy(encryptedCounter, 0, _gammaBuffer, i * 16, 16);
-
-                // Инкрементируем временный счетчик
-                for (int j = 15; j >= 0; j--)
+                int processed = 0;
+                while (processed < length)
                 {
-                    tempCounter[j]++;
-                    if (tempCounter[j] != 0)
-                        break;
+                    if (_gammaBufferOffset >= _gammaBuffer.Length)
+                        GenerateGammaBlock();
+
+                    int blockSize = Math.Min(length - processed, _gammaBuffer.Length - _gammaBufferOffset);
+                    for (int i = 0; i < blockSize; i++)
+                        destination[destinationOffset + processed + i] =
+                            (byte)(source[sourceOffset + processed + i] ^ _gammaBuffer[_gammaBufferOffset + i]);
+
+                    processed += blockSize;
+                    _gammaBufferOffset += blockSize;
                 }
             }
+        }
 
-            // Обновляем основной счетчик
-            Array.Copy(tempCounter, _counter, 16);
+        public void XorInPlace(byte[] data, int offset, int length)
+        {
+            Xor(data, offset, data, offset, length);
+        }
+
+        private void GenerateGammaBlock()
+        {
+            byte[] encryptedCounter = _kuznechik.EncryptBlock(_counter, _masterKey);
+            Array.Copy(encryptedCounter, 0, _gammaBuffer, 0, 16);
+
+            // В режиме CTR по ГОСТ Р 34.13-2015 увеличивается младшая
+            // 64-битная половина 128-битного счетчика.
+            for (int j = 15; j >= 8; j--)
+            {
+                _counter[j]++;
+                if (_counter[j] != 0)
+                    break;
+            }
+
             _gammaBufferOffset = 0;
         }
 
@@ -221,8 +228,8 @@ namespace ChatClient.ProtocolSignal
                 j++;
             }
             j = 0;
-            iterK[0] = B;
-            iterK[1] = A;
+            iterK[0] = A;
+            iterK[1] = B;
 
             byte[] C = new byte[16];
             byte[] D = new byte[16];
@@ -254,104 +261,116 @@ namespace ChatClient.ProtocolSignal
 
         public byte[] KuzEncript(byte[] file, byte[] masterKey)
         {
-            masterKey = Encoding.Default.GetBytes(LengthTo32Bytes(Encoding.Default.GetString(masterKey)));
+            ValidateKey(masterKey);
+            if (file == null)
+                throw new ArgumentNullException(nameof(file));
+
             KuzKeyGen(masterKey);
-            int NumOfBlocks; // Определение кол-ва блоков по 16 байт
-            int NumberOfNull; // Определение кол-ва недостающих байт последнего блока
-            byte[] OriginText = file;
-            byte[] encrText = new byte[0]; // Массив для хранения зашифрованных байтов
-            if ((file.Length % 16) == 0)
-            {
-                NumOfBlocks = file.Length / 16;
-                Array.Resize(ref encrText, file.Length);
-            }
-            else
-            {
-                NumOfBlocks = (file.Length / 16) + 1;
-                NumberOfNull = NumOfBlocks * 16 - file.Length;
-                int StartLength = file.Length;
-                Array.Resize(ref OriginText, OriginText.Length + NumberOfNull);
-                Array.Resize(ref encrText, OriginText.Length);
-                if (NumberOfNull == 1) OriginText[OriginText.Length - 1] = 0x80;
-                else
-                {
-                    for (int i = OriginText.Length - 1; i >= 0; i--)
-                    {
-                        if (i == OriginText.Length - 1)
-                        {
-                            OriginText[OriginText.Length - 1] = 0x81;
-                        }
-                        else if (OriginText[i] != 0)
-                        {
-                            OriginText[i + 1] = 0x01;
-                            break;
-                        }
-                    }
-                }
-            }
-            for (int i = 0; i < NumOfBlocks; i++) // Операция зашифровки
-            {
-                byte[] block = new byte[16];
-                for (int j = 0; j < 16; j++)
-                {
-                    block[j] = OriginText[i * 16 + j];
-                }
-                for (int j = 0; j < 9; j++)
-                {
-                    block = KuzX(block, iterK[j]);
-                    block = KuzS(block);
-                    block = KuzL(block);
-                }
-                block = KuzX(block, iterK[9]);
-                for (int j = 0; j < 16; j++)
-                {
-                    encrText[i * 16 + j] = block[j];
-                }
-            }
-            return encrText;
+            byte[] iv = new byte[8];
+            using (RandomNumberGenerator random = RandomNumberGenerator.Create())
+                random.GetBytes(iv);
+
+            byte[] encrypted = ProcessCtr(file, iv);
+            byte[] result = new byte[iv.Length + encrypted.Length];
+            Array.Copy(iv, 0, result, 0, iv.Length);
+            Array.Copy(encrypted, 0, result, iv.Length, encrypted.Length);
+            return result;
         } // Функция зашифрования
 
         public byte[] KuzDecript(byte[] file, byte[] masterKey)
         {
-            masterKey = Encoding.Default.GetBytes(LengthTo32Bytes(Encoding.Default.GetString(masterKey)));
+            ValidateKey(masterKey);
+            if (file == null)
+                throw new ArgumentNullException(nameof(file));
+            if (file.Length < 8)
+                throw new ArgumentException("Шифротекст не содержит 8-байтовый IV.", nameof(file));
+
             KuzKeyGen(masterKey);
-            int NumOfBlocks = file.Length / 16; // Определение кол-ва блоков по 16 байт
-            byte[] OriginText = file;
-            byte[] decrText = new byte[file.Length]; // Массив для хранения зашифрованных байтов
-            for (int i = 0; i < NumOfBlocks; i++)
+            byte[] iv = new byte[8];
+            byte[] encrypted = new byte[file.Length - iv.Length];
+            Array.Copy(file, 0, iv, 0, iv.Length);
+            Array.Copy(file, iv.Length, encrypted, 0, encrypted.Length);
+            return ProcessCtr(encrypted, iv);
+        }
+
+        private byte[] ProcessCtr(byte[] input, byte[] iv)
+        {
+            byte[] result = new byte[input.Length];
+            byte[] counter = new byte[16];
+            Array.Copy(iv, counter, 8);
+
+            for (int offset = 0; offset < input.Length; offset += 16)
             {
-                byte[] block = new byte[16];
-                for (int j = 0; j < 16; j++)
+                byte[] gamma = EncryptBlockWithRoundKeys(counter);
+                int length = Math.Min(16, input.Length - offset);
+                for (int i = 0; i < length; i++)
+                    result[offset + i] = (byte)(input[offset + i] ^ gamma[i]);
+
+                for (int i = 15; i >= 8; i--)
                 {
-                    block[j] = OriginText[i * 16 + j];
-                }
-                block = KuzX(block, iterK[9]);
-                for (int j = 8; j >= 0; j--)
-                {
-                    block = KuzLReverse(block);
-                    block = KuzSReverse(block);
-                    block = KuzX(block, iterK[j]);
-                }
-                for (int j = 0; j < 16; j++)
-                {
-                    decrText[i * 16 + j] = block[j];
-                }
-                if (i == NumOfBlocks - 1 && (decrText[decrText.Length - 1] == 0x81 || decrText[decrText.Length - 1] == 0x80))
-                {
-                    if (decrText[decrText.Length - 1] == 0x81)
-                    {
-                        int Zeros = 0;
-                        for (int j = decrText.Length - 1; j > 0; j--)
-                        {
-                            if (decrText[j] == 0x81 || decrText[j] == 0x01 || decrText[j] == 0) Zeros++;
-                            else break;
-                        }
-                        Array.Resize(ref decrText, decrText.Length - Zeros);
-                    }
-                    if (decrText[decrText.Length - 1] == 0x80) Array.Resize(ref decrText, decrText.Length - 1);
+                    counter[i]++;
+                    if (counter[i] != 0)
+                        break;
                 }
             }
-            return decrText;
+
+            return result;
+        }
+
+        public byte[] EncryptBlock(byte[] block, byte[] masterKey)
+        {
+            ValidateBlock(block);
+            ValidateKey(masterKey);
+            KuzKeyGen(masterKey);
+            return EncryptBlockWithRoundKeys(block);
+        }
+
+        public byte[] DecryptBlock(byte[] block, byte[] masterKey)
+        {
+            ValidateBlock(block);
+            ValidateKey(masterKey);
+            KuzKeyGen(masterKey);
+            return DecryptBlockWithRoundKeys(block);
+        }
+
+        private byte[] EncryptBlockWithRoundKeys(byte[] input)
+        {
+            byte[] block = (byte[])input.Clone();
+            for (int round = 0; round < 9; round++)
+            {
+                block = KuzX(block, iterK[round]);
+                block = KuzS(block);
+                block = KuzL(block);
+            }
+            return KuzX(block, iterK[9]);
+        }
+
+        private byte[] DecryptBlockWithRoundKeys(byte[] input)
+        {
+            byte[] block = KuzX(input, iterK[9]);
+            for (int round = 8; round >= 0; round--)
+            {
+                block = KuzLReverse(block);
+                block = KuzSReverse(block);
+                block = KuzX(block, iterK[round]);
+            }
+            return block;
+        }
+
+        private static void ValidateKey(byte[] key)
+        {
+            if (key == null)
+                throw new ArgumentNullException(nameof(key));
+            if (key.Length != 32)
+                throw new ArgumentException("Ключ должен быть 32 байта (256 бит).", nameof(key));
+        }
+
+        private static void ValidateBlock(byte[] block)
+        {
+            if (block == null)
+                throw new ArgumentNullException(nameof(block));
+            if (block.Length != 16)
+                throw new ArgumentException("Блок должен быть 16 байт (128 бит).", nameof(block));
         }
 
         #endregion
@@ -456,22 +475,5 @@ namespace ChatClient.ProtocolSignal
 
         #endregion
 
-        private string LengthTo32Bytes(string str)
-        {
-            if (str.Length < 32)
-            {
-                int diff = 32 - str.Length;
-                int j = 0;
-                for (int i = str.Length; i < 32; i++)
-                {
-                    str += str.Substring(j, 1);
-                    if (j == str.Length - 1) j = 0;
-                    else j++;
-                }
-                return str;
-            }
-            else if (str.Length > 32) return str = str.Substring(0, 32);
-            else return str;
-        }
     }
 }

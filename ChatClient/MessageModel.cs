@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Media;
 
 namespace ChatClient
@@ -15,14 +11,32 @@ namespace ChatClient
     }
     public class MessageModel : INotifyPropertyChanged
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Text { get; set; }
-        public DateTime Timestamp { get; set; }
-        public bool IsOwnMessage { get; set; }
-
+        private string _text;
+        private bool _isOwnMessage;
         private MessageStatus _status = MessageStatus.Sent;
-
         private MessageType _type = MessageType.Normal;
+
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Text
+        {
+            get => _text;
+            set
+            {
+                _text = value;
+                OnPropertyChanged(nameof(Text));
+            }
+        }
+        public DateTime Timestamp { get; set; }
+        public bool IsOwnMessage
+        {
+            get => _isOwnMessage;
+            set
+            {
+                _isOwnMessage = value;
+                OnPropertyChanged(nameof(IsOwnMessage));
+            }
+        }
+
         public MessageType Type
         {
             get => _type;

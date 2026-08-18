@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,7 +16,11 @@ namespace ChatClient
         {
             _ui = SynchronizationContext.Current ?? new SynchronizationContext();
             _connection = new HubConnectionBuilder()
-                .WithUrl(url)
+                .WithUrl(url, options =>
+                {
+                    options.Transports = HttpTransportType.WebSockets;
+                })
+                .AddMessagePackProtocol()
                 .Build();
 
             _connection.On<byte[], byte[]>("GetConnectionAndPublicKey",
@@ -38,7 +44,7 @@ namespace ChatClient
             _connection.On<int>("CallEnded",
                 fromUserId => Post(() => CallEnded?.Invoke(fromUserId)));
             _connection.On<int, byte[]>("ReceiveVoice",
-                (fromUserId, voiceData) => Post(() => ReceiveVoice?.Invoke(fromUserId, voiceData)));
+                (fromUserId, voiceData) => ReceiveVoice?.Invoke(fromUserId, voiceData));
             _connection.On<int, byte[], byte[]>("ReceiveVoiceKeys",
                 (fromUserId, sessionKey, iv) => Post(() => ReceiveVoiceKeys?.Invoke(fromUserId, sessionKey, iv)));
         }
@@ -58,79 +64,53 @@ namespace ChatClient
         public event Action<int, byte[]> ReceiveVoice;
         public event Action<int, byte[], byte[]> ReceiveVoiceKeys;
 
-        public void Start()
-        {
-            _connection.StartAsync().GetAwaiter().GetResult();
-        }
+        public Task StartAsync() => _connection.StartAsync();
 
-        public int CreateUser(byte[] publicKey, byte[] signPublicKey)
-        {
-            return Invoke<int>(nameof(CreateUser), publicKey, signPublicKey);
-        }
+        public Task<int> CreateUserAsync(byte[] publicKey, byte[] signPublicKey) =>
+            Invoke<int>("CreateUser", publicKey, signPublicKey);
 
-        public void Connect(int myId)
-        {
-            Invoke(nameof(Connect), myId);
-        }
+        public Task ConnectAsync(int myId) => Invoke("Connect", myId);
 
-        public void Disconnect(int identificator)
-        {
-            Invoke(nameof(Disconnect), identificator);
-        }
+        public Task DisconnectAsync(int identificator) => Invoke("Disconnect", identificator);
 
-        public void RemoveUserSearch(int identificator)
-        {
-            Invoke(nameof(RemoveUserSearch), identificator);
-        }
+        public Task RemoveUserSearchAsync(int identificator) => Invoke("RemoveUserSearch", identificator);
 
-        public void SendSignedMessage(byte[] hmac, byte[] message, byte[] signature, int identificator)
-        {
-            Invoke(nameof(SendSignedMessage), hmac, message, signature, identificator);
-        }
+        public Task SendSignedMessageAsync(byte[] hmac, byte[] message, byte[] signature, int identificator) =>
+            Invoke("SendSignedMessage", hmac, message, signature, identificator);
 
-        public void SendHashProtocol(byte[] key, byte[] hmac, int id)
-        {
-            Invoke(nameof(SendHashProtocol), key, hmac, id);
-        }
+        public Task SendHashProtocolAsync(byte[] key, byte[] hmac, int id) =>
+            Invoke("SendHashProtocol", key, hmac, id);
 
-        public void SendHashEquals(bool state, int id)
-        {
-            Invoke(nameof(SendHashEquals), state, id);
-        }
+        public Task SendHashEqualsAsync(bool state, int id) => Invoke("SendHashEquals", state, id);
 
-        public void SendCallRequest(int userId, string callerIP, int callerPort)
-        {
-            Invoke(nameof(SendCallRequest), userId, callerIP, callerPort);
-        }
+        public Task SendCallRequestAsync(int userId, string callerIP, int callerPort) =>
+            Invoke("SendCallRequest", userId, callerIP, callerPort);
 
-        public void SendCallAnswer(int userId, bool accept, string answererIP, int answererPort)
-        {
-            Invoke(nameof(SendCallAnswer), userId, accept, answererIP, answererPort);
-        }
+        public Task SendCallAnswerAsync(int userId, bool accept, string answererIP, int answererPort) =>
+            Invoke("SendCallAnswer", userId, accept, answererIP, answererPort);
 
-        public void SendCallEnd(int userId)
-        {
-            Invoke(nameof(SendCallEnd), userId);
-        }
+        public Task SendCallEndAsync(int userId) => Invoke("SendCallEnd", userId);
 
         public void RelayVoice(int fromUserId, byte[] voiceData)
         {
-            _ = _connection.SendAsync(nameof(RelayVoice), fromUserId, voiceData);
+            _ = _connection.SendAsync("RelayVoice", fromUserId, voiceData);
         }
 
-        public void SendVoiceKeys(int fromUserId, byte[] sessionKey, byte[] iv)
-        {
-            Invoke(nameof(SendVoiceKeys), fromUserId, sessionKey, iv);
-        }
+        public Task SendVoiceKeysAsync(int fromUserId, byte[] sessionKey, byte[] iv) =>
+            Invoke("SendVoiceKeys", fromUserId, sessionKey, iv);
 
         public void Dispose()
         {
-            if (_connection.State != HubConnectionState.Disconnected)
+            try
             {
-                _connection.StopAsync().GetAwaiter().GetResult();
-            }
+                if (_connection.State != HubConnectionState.Disconnected)
+                    _connection.StopAsync().GetAwaiter().GetResult();
 
-            _connection.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                _connection.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch
+            {
+            }
         }
 
         private void Post(Action action)
@@ -138,14 +118,10 @@ namespace ChatClient
             _ui.Post(_ => action(), null);
         }
 
-        private T Invoke<T>(string method, params object[] args)
-        {
-            return _connection.InvokeCoreAsync<T>(method, args).GetAwaiter().GetResult();
-        }
+        private Task<T> Invoke<T>(string method, params object[] args) =>
+            _connection.InvokeCoreAsync<T>(method, args ?? Array.Empty<object>());
 
-        private void Invoke(string method, params object[] args)
-        {
-            _connection.InvokeCoreAsync(method, args).GetAwaiter().GetResult();
-        }
+        private Task Invoke(string method, params object[] args) =>
+            _connection.InvokeCoreAsync(method, args ?? Array.Empty<object>());
     }
 }
