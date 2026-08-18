@@ -7,7 +7,8 @@ builder.Services.AddSignalR(options =>
 {
     options.MaximumReceiveMessageSize = 64 * 1024;
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
-});
+    options.StreamBufferCapacity = 4;
+}).AddMessagePackProtocol();
 
 var app = builder.Build();
 

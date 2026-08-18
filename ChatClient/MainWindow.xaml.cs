@@ -1,63 +1,56 @@
 ﻿using ChatClient.Protocol_Signal;
 using ChatClient.ProtocolSignal;
 using ChatClient.ViewModel;
-using Org.BouncyCastle.Asn1.X9;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Configuration;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Security.Policy;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using System.Windows.Threading;
+
 namespace ChatClient
 {
-    /// <summary>
-    /// Логика взаимодействия для MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
         private ChatHubClient client;
-        private readonly MainViewModel _viewModel;
+        private readonly MainViewModel _viewModel = new MainViewModel();
         private ECDiffieHellman alice;
         private byte[] aliceSharedSecret;
         private byte[] aesKey;
         private byte[] hmacKey;
+        private byte[] _publicKey;
+        private byte[] _signPublicKey;
         private Kuznechik kuznechik;
         private GostSignature _signature;
-        private ObservableCollection<MessageModel> _messages = new ObservableCollection<MessageModel>();
-        private Dictionary<string, MessageModel> _messageDict = new Dictionary<string, MessageModel>();
-        private State state {get; set;}
+        private readonly Dictionary<string, MessageModel> _messageDict = new Dictionary<string, MessageModel>();
+        private State state = State.NoSearch;
         private int ID = -1;
 
         private SimpleVoiceCall _voiceCall;
-        private bool _isInCall = false;
-        private bool _isMuted = false;
+        private bool _isInCall;
+        private bool _isMuted;
         private string _myIP;
-        private int _voicePort = 5000;
-        private string _portFile = "voice_port.txt";
+        private int _voicePort;
+        private const string PortFile = "voice_port.txt";
+        private const int VoicePortMin = 6100;
+        private const int VoicePortMax = 7100;
         private float _peerVolume = 1.0f;
-        private bool _isPeerMuted = false; // Заглушен ли собеседник
-        private int _peerId;
-        private string _peerIP;
-        private Random _random = new Random();
-        private byte[] _voiceSessionKey;  // Сессионный ключ для голоса
-        private byte[] _voiceIV;          // Вектор инициализации для голоса
-        private bool _voiceEncryptionEnabled = true;
-
+        private bool _isPeerMuted;
+        private byte[] _voiceSessionKey;
+        private byte[] _voiceIV;
+        private readonly CallTonePlayer _callTones = new CallTonePlayer();
+        private string _incomingCallerIP;
+        private int _incomingCallerPort;
 
         private enum State
         {
@@ -66,15 +59,18 @@ namespace ChatClient
             FoundNoClient,
             NoSearch
         }
+
         public MainWindow()
         {
             InitializeComponent();
-            ListViewMessage.ItemsSource = _messages;
-            _viewModel = new MainViewModel();
+            DataContext = _viewModel;
+            _viewModel.Messages.CollectionChanged += Messages_CollectionChanged;
+
             alice = ECDiffieHellman.Create(GostCurve.GetGost3410Curve());
-            byte[] publicKey = alice.PublicKey.ToByteArray();
+            _publicKey = alice.PublicKey.ToByteArray();
             _signature = new GostSignature();
-            byte[] mySignPublicKey = _signature.GetPublicKey();
+            _signPublicKey = _signature.GetPublicKey();
+
             string hubUrl = ConfigurationManager.AppSettings["ChatHubUrl"] ?? "http://localhost:5000/chat";
             client = new ChatHubClient(hubUrl);
             client.GetConnectionAndPublicKey += GetConnectionAndPublicKey;
@@ -89,73 +85,88 @@ namespace ChatClient
             client.CallEnded += CallEnded;
             client.ReceiveVoice += ReceiveVoice;
             client.ReceiveVoiceKeys += ReceiveVoiceKeys;
+
+            _voicePort = GetPortFromFile();
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
             try
             {
-                client.Start();
-                ID = client.CreateUser(publicKey, mySignPublicKey);
+                await client.StartAsync();
+                ID = await client.CreateUserAsync(_publicKey, _signPublicKey);
+                _viewModel.IsFindEnabled = true;
             }
             catch (Exception ex)
             {
+                _viewModel.IsFindEnabled = false;
                 MessageBox.Show(
                     "Не удалось подключиться к серверу чата.\nСначала запустите ChatServer (http://localhost:5000).\n\n" + ex.Message,
                     "Нет соединения",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
-            state = State.NoSearch;
-            ListViewMessage.Visibility = Visibility.Hidden;
-            TextBoxMessage.Visibility = Visibility.Hidden;
-            _voicePort = GetPortFromFile();
-        }
-        private void Find()
-        {
-            if (client == null || !client.IsConnected || ID == -1)
-                return;
-            client.Connect(ID);
         }
 
-        private void DisconnectUser()
+        private bool _isClosing;
+
+        private async void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            Dispatcher.Invoke(() =>
+            if (_isClosing)
+                return;
+
+            e.Cancel = true;
+            _isClosing = true;
+            await DisconnectUserAsync();
+            _callTones.Dispose();
+            client?.Dispose();
+            Close();
+        }
+
+        private bool CanTalkToServer => client != null && client.IsConnected && ID != -1;
+
+        private async Task FindAsync()
+        {
+            if (!CanTalkToServer)
+                return;
+
+            await client.ConnectAsync(ID);
+        }
+
+        private async Task DisconnectUserAsync(bool resetUi = true)
+        {
+            if (_isInCall)
             {
-                if (client != null && client.IsConnected && ID != -1)
+                try
                 {
-                    try
-                    {
-                        client.Disconnect(ID);
-                    }
-                    catch
-                    {
-                    }
+                    if (CanTalkToServer)
+                        await client.SendCallEndAsync(ID);
+                }
+                catch
+                {
                 }
 
-                LabelState.Content = "Состояние: Стандартное";
-                Button1.Content = "Найти собеседника";
-                ListViewMessage.Visibility = Visibility.Hidden;
-                TextBoxMessage.Visibility = Visibility.Hidden;
-                CallPanel.Visibility = Visibility.Collapsed;
-                TextBoxMessage.IsEnabled = false;
-                state = State.NoSearch;
+                EndCall();
+            }
 
-                _voiceCall?.HangUp();
-                _isInCall = false;
+            if (CanTalkToServer)
+            {
+                try
+                {
+                    await client.DisconnectAsync(ID);
+                }
+                catch
+                {
+                }
+            }
 
-                // ✅ Очищаем коллекцию, а не напрямую Items
-                _messages.Clear();
-                _messageDict.Clear();
-            });
-        }
+            if (!resetUi)
+                return;
 
-
-        private void Window_Loaded(object sender, RoutedEventArgs e)
-        {
-
-        }
-
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            DisconnectUser();
-            client?.Dispose();
+            TextBoxMessage.Clear();
+            _viewModel.ResetToIdle();
+            _messageDict.Clear();
+            state = State.NoSearch;
         }
 
         public void GetConnectionAndPublicKey(byte[] publickey, byte[] signPublicKey)
@@ -164,776 +175,512 @@ namespace ChatClient
             {
                 _signature.SetPeerKey(signPublicKey);
                 state = State.Found;
-                aliceSharedSecret = SignalProtocolExample.GenerateSharedSecret(ECDiffieHellmanCngPublicKey.FromByteArray(publickey, CngKeyBlobFormat.EccFullPublicBlob), alice);
-            }
-            else
-            {
-                state = State.Search;
-            }
-
-            if (state == State.Found)
-            {
+                aliceSharedSecret = SignalProtocolExample.GenerateSharedSecret(
+                    ECDiffieHellmanCngPublicKey.FromByteArray(publickey, CngKeyBlobFormat.EccFullPublicBlob),
+                    alice);
                 TestProtocol();
+                return;
             }
-            else
-            {
-                LabelState.Content = "Состояние: Поиск собеседника";
-                Button1.Content = "Отменить поиск";
 
-                state = State.Search;
-            }
+            state = State.Search;
+            _viewModel.ShowSearching();
         }
-        public void TestProtocol()
+
+        public async void TestProtocol()
         {
             byte[] nonce = new byte[32];
             using (var rng = RandomNumberGenerator.Create())
-            {
                 rng.GetBytes(nonce);
-            }
-            // Вычисляем HMAC
-            byte[] hmac = SignalProtocolExample.ComputeHmac(nonce, aliceSharedSecret);
 
-            // Отправляем nonce и hmac Клиенту 2 (но не секрет!)
-            client.SendHashProtocol(nonce, hmac, ID);
+            byte[] hmac = SignalProtocolExample.ComputeHmac(nonce, aliceSharedSecret);
+            await client.SendHashProtocolAsync(nonce, hmac, ID);
         }
+
         public void GetConnectionProtocol(bool work)
         {
-            if (work)
+            if (!work)
             {
-                LabelState.Content = "Состояние: Ваш собеседник найден";
-                Button1.Content = "Отключиться";
-                CallPanel.Visibility = Visibility.Visible;
-                CallButton.Visibility = Visibility.Visible;
-                ListViewMessage.Visibility = Visibility.Visible;
-                TextBoxMessage.Visibility = Visibility.Visible;
-                TextBoxMessage.IsEnabled = true;
-
-                _myIP = GetLocalIPAddress();
-
-                state = State.Found;
-
-                SignalProtocolExample.DeriveKeys(aliceSharedSecret, out aesKey, out hmacKey);
-                kuznechik = new Kuznechik();
+                state = State.NoSearch;
+                _ = DisconnectUserAsync(resetUi: false);
+                _viewModel.ShowProtocolFailed();
+                return;
             }
+
+            _viewModel.ShowConnected();
+            _myIP = GetLocalIPAddress();
+            state = State.Found;
+
+            SignalProtocolExample.DeriveKeys(aliceSharedSecret, out aesKey, out hmacKey);
+            kuznechik = new Kuznechik();
         }
 
-        public void CompareHMAC(byte[] key, byte[] hmac)
+        public async void CompareHMAC(byte[] key, byte[] hmac)
         {
             byte[] test = SignalProtocolExample.ComputeHmac(key, aliceSharedSecret);
-            if (test.SequenceEqual(hmac))
-            {
-                client.SendHashEquals(true, ID);
-            }
-
+            bool matches = test.SequenceEqual(hmac);
+            await client.SendHashEqualsAsync(matches, ID);
         }
+
         public void LeftChat()
         {
-            LabelState.Content = "Состояние: Чат без собеседника";
-            TextBoxMessage.IsEnabled = false;
+            EndCall();
+            _viewModel.ShowPeerLeft();
             TextBoxMessage.Clear();
-            CallPanel.Visibility = Visibility.Collapsed;
-
-            _voiceCall?.HangUp();
-            _isInCall = false;
-
             state = State.FoundNoClient;
         }
 
-        private void Button2_Click_1(object sender, RoutedEventArgs e)
-        {
-            DisconnectUser();
-        }
         private void Border_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if(e.LeftButton == MouseButtonState.Pressed)
-            {
+            if (e.LeftButton == MouseButtonState.Pressed)
                 DragMove();
-            }
         }
 
         private void ButtonMinizime_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.MainWindow.WindowState = WindowState.Minimized;
+            WindowState = WindowState.Minimized;
         }
 
         private void WindowButtonState_Click(object sender, RoutedEventArgs e)
         {
-            if(Application.Current.MainWindow.WindowState != WindowState.Maximized)
-            {
-                Application.Current.MainWindow.WindowState = WindowState.Maximized;
-            }
-            else
-            {
-                Application.Current.MainWindow.WindowState = WindowState.Normal;
-            }
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.Shutdown();   
+            Close();
         }
 
-        private void ButtonFindAndCancelAndDisconnect_Click(object sender, RoutedEventArgs e)
+        private async void ButtonFindAndCancelAndDisconnect_Click(object sender, RoutedEventArgs e)
         {
             if (state == State.NoSearch)
-            {
-                Find();
-            }
+                await FindAsync();
             else if (state == State.Search)
-            {
-                CancelSearch();
-            }
+                await CancelSearchAsync();
             else
-            {
-                DisconnectUser();
-            }
+                await DisconnectUserAsync();
         }
-        private void CancelSearch()
+
+        private async Task CancelSearchAsync()
         {
-            client.RemoveUserSearch(ID);
+            if (CanTalkToServer)
+                await client.RemoveUserSearchAsync(ID);
 
-            LabelState.Content = "Состояние: Стандартное";
-            Button1.Content = "Найти собеседника";
-
+            _viewModel.ResetToIdle();
             state = State.NoSearch;
         }
 
         public void MessageNotification(string text)
         {
-            Dispatcher.Invoke(() =>
-            {
-                // Создаем системное сообщение (по центру)
-                var systemMessage = new MessageModel
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Text = text,
-                    Timestamp = DateTime.Now,
-                    IsOwnMessage = false,
-                    Type = MessageType.System,  // ← Системное сообщение
-                    Status = MessageStatus.Sent
-                };
-
-                _messages.Add(systemMessage);
-
-                // Прокручиваем к новому сообщению
-                if (ListViewMessage.Items.Count > 0)
-                {
-                    ListViewMessage.ScrollIntoView(systemMessage);
-                }
-            });
-        }
-
-        private void TextBoxMessage_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            // Автоматическое увеличение высоты
-            if (TextBoxMessage.LineCount > 1 && TextBoxMessage.Height < 150)
-            {
-                TextBoxMessage.Height = TextBoxMessage.LineCount * 20;
-            }
-            else if (TextBoxMessage.LineCount <= 1)
-            {
-                TextBoxMessage.Height = 44;
-            }
-
-            // Можно добавить проверку на максимальную длину сообщения
+            _viewModel.AddSystemMessage(text);
+            ScrollToLast();
         }
 
         private void TextBox_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter)
+            if (e.Key != Key.Enter)
+                return;
+
+            if (Keyboard.Modifiers == ModifierKeys.Shift)
             {
-                if (Keyboard.Modifiers == ModifierKeys.Shift)
-                {
-                    var textBox = (TextBox)sender;
-                    int caretPos = textBox.CaretIndex;
-                    textBox.Text = textBox.Text.Insert(caretPos, Environment.NewLine);
-                    textBox.CaretIndex = caretPos + 1;
-                    e.Handled = true;
-                }
-                else
-                {
-                    if (client != null && !string.IsNullOrWhiteSpace(TextBoxMessage.Text))
-                    {
-                        e.Handled = true;
-                        string text = TextBoxMessage.Text.Trim();
-
-                        // Создаем визуальное сообщение
-                        var message = new MessageModel
-                        {
-                            Text = text,
-                            Timestamp = DateTime.Now,
-                            IsOwnMessage = true,
-                            Status = MessageStatus.Sent
-                        };
-
-                        // Добавляем в UI
-                        _messages.Add(message);
-                        _messageDict[message.Id] = message;
-
-                        // Прокручиваем к новому сообщению
-                        ListViewMessage.ScrollIntoView(message);
-
-                        // Отправляем (ваш существующий код)
-                        byte[] messageBytes = Encoding.UTF8.GetBytes(text);
-                        byte[] signature = _signature.Sign(messageBytes);
-                        byte[] encrypted = kuznechik.KuzEncript(messageBytes, aesKey);
-                        byte[] hmac = SignalProtocolExample.ComputeHmac(hmacKey, messageBytes);
-                        client.SendSignedMessage(hmac, encrypted, signature, ID);
-
-                        // Очищаем поле
-                        TextBoxMessage.Text = string.Empty;
-                    }
-                }
+                var textBox = (TextBox)sender;
+                int caretPos = textBox.CaretIndex;
+                textBox.Text = textBox.Text.Insert(caretPos, Environment.NewLine);
+                textBox.CaretIndex = caretPos + Environment.NewLine.Length;
+                e.Handled = true;
+                return;
             }
+
+            if (client == null || string.IsNullOrWhiteSpace(TextBoxMessage.Text) || kuznechik == null)
+                return;
+
+            e.Handled = true;
+            _ = SendCurrentMessageAsync();
         }
 
-        public void MessageCallBack(string message, byte[] bytes = null)
+        private async Task SendCurrentMessageAsync()
         {
-            string text = message;
-            if (bytes != null)
+            string text = TextBoxMessage.Text.Trim();
+            if (string.IsNullOrEmpty(text) || !CanTalkToServer)
+                return;
+
+            var message = _viewModel.AddChatMessage(text, true, MessageStatus.Sent);
+            _messageDict[message.Id] = message;
+            ScrollToLast();
+            TextBoxMessage.Text = string.Empty;
+
+            try
             {
-                byte[] decryptedMessage = kuznechik.KuzDecript(bytes, aesKey);
-                string decryptedText = Encoding.UTF8.GetString(decryptedMessage);
-                text += decryptedText;
+                byte[] messageBytes = Encoding.UTF8.GetBytes(text);
+                byte[] signature = _signature.Sign(messageBytes);
+                byte[] encrypted = kuznechik.KuzEncript(messageBytes, aesKey);
+                byte[] hmac = SignalProtocolExample.ComputeHmac(hmacKey, encrypted);
+                await client.SendSignedMessageAsync(hmac, encrypted, signature, ID);
+                message.Status = MessageStatus.Delivered;
             }
-            ListViewMessage.Items.Add(text);
-            ListViewMessage.ScrollIntoView(ListViewMessage.Items[ListViewMessage.Items.Count - 1]);
+            catch (Exception ex)
+            {
+                _viewModel.AddSystemMessage("Не удалось отправить сообщение: " + ex.Message);
+            }
         }
 
         public void MessageCallBack(byte[] hmac, string message, byte[] bytes)
         {
-            string text = message;
-            if (bytes != null)
+            string text = message ?? string.Empty;
+            if (bytes != null && hmac != null && kuznechik != null && hmacKey != null)
             {
-                byte[] decryptedMessage = kuznechik.KuzDecript(bytes, aesKey);
-                byte[] newHmac = SignalProtocolExample.ComputeHmac(hmacKey, decryptedMessage);
-
+                byte[] newHmac = SignalProtocolExample.ComputeHmac(hmacKey, bytes);
                 if (newHmac.SequenceEqual(hmac))
                 {
-                    string decryptedText = Encoding.UTF8.GetString(decryptedMessage);
-                    text += decryptedText;
+                    byte[] decryptedMessage = kuznechik.KuzDecript(bytes, aesKey);
+                    text += Encoding.UTF8.GetString(decryptedMessage);
                 }
-
+                else
+                {
+                    text += "⚠ ПОДДЕЛЬНОЕ СООБЩЕНИЕ";
+                }
             }
-            ListViewMessage.Items.Add(text);
-            ListViewMessage.ScrollIntoView(ListViewMessage.Items[ListViewMessage.Items.Count - 1]);
+
+            _viewModel.AddChatMessage(text, false, MessageStatus.Delivered);
+            ScrollToLast();
         }
 
         public void MessageCallBackSigned(byte[] hmac, string message, byte[] bytes, byte[] signature)
         {
-            byte[] decrypted = kuznechik.KuzDecript(bytes, aesKey);
-
-            // Проверка HMAC
-            byte[] computedHmac = SignalProtocolExample.ComputeHmac(hmacKey, decrypted);
-            bool hmacValid = computedHmac.SequenceEqual(hmac);
-
-            // Проверка подписи
-            bool signatureValid = _signature.Verify(decrypted, signature);
-
-            // ВАЖНО: переменная messageText, а не text
-            string messageText = Encoding.UTF8.GetString(decrypted);
-
-            Dispatcher.Invoke(() =>
+            if (hmac == null || bytes == null ||
+                !SignalProtocolExample.ComputeHmac(hmacKey, bytes).SequenceEqual(hmac))
             {
-                var newMessage = new MessageModel  // Переименовал в newMessage
-                {
-                    Text = messageText,  // Используем messageText
-                    Timestamp = DateTime.Now,
-                    IsOwnMessage = false,
-                    Status = MessageStatus.Delivered
-                };
-
-                // Если проверка не прошла - помечаем
-                if (!hmacValid || !signatureValid)
-                {
-                    newMessage.Text = $"⚠ ПОДДЕЛЬНОЕ: {messageText}";
-                }
-                _messages.Add(newMessage);
-                ListViewMessage.ScrollIntoView(newMessage);
-            });
-        }
-
-        /// <summary>
-        /// Заглушка для правого клика на свой аватар (регулировка микрофона)
-        /// </summary>
-        private void MyAvatar_MouseRightButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            // TODO: Реализовать после добавления голосовой связи
-            MessageNotification("🎤 Регулировка микрофона (будет доступна после реализации голосовой связи)");
-        }
-
-        /// <summary>
-        /// Заглушка для правого клика на аватар собеседника (регулировка громкости)
-        /// </summary>
-        private void PeerAvatar_MouseRightButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if (!_isInCall)
-            {
-                MessageNotification("🔇 Нет активного звонка");
+                _viewModel.AddChatMessage("⚠ ПОДДЕЛЬНОЕ СООБЩЕНИЕ", false, MessageStatus.Delivered);
+                ScrollToLast();
                 return;
             }
 
-            // Создаем стилизованное контекстное меню
+            byte[] decrypted = kuznechik.KuzDecript(bytes, aesKey);
+            bool signatureValid = _signature.Verify(decrypted, signature);
+            string messageText = Encoding.UTF8.GetString(decrypted);
+
+            if (!signatureValid)
+                messageText = "⚠ ПОДДЕЛЬНОЕ: " + messageText;
+
+            _viewModel.AddChatMessage(messageText, false, MessageStatus.Delivered);
+            ScrollToLast();
+        }
+
+        private void Messages_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action == NotifyCollectionChangedAction.Add)
+                ScrollToLast();
+        }
+
+        private void ScrollToLast()
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                ListViewMessage.UpdateLayout();
+                ScrollViewer viewer = FindScrollViewer(ListViewMessage);
+                if (viewer != null)
+                    viewer.ScrollToEnd();
+                else if (ListViewMessage.Items.Count > 0)
+                    ListViewMessage.ScrollIntoView(ListViewMessage.Items[ListViewMessage.Items.Count - 1]);
+            }), DispatcherPriority.Loaded);
+        }
+
+        private static ScrollViewer FindScrollViewer(DependencyObject root)
+        {
+            if (root is ScrollViewer viewer)
+                return viewer;
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            {
+                ScrollViewer child = FindScrollViewer(VisualTreeHelper.GetChild(root, i));
+                if (child != null)
+                    return child;
+            }
+
+            return null;
+        }
+
+        private void MyAvatar_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (!_isInCall)
+            {
+                _viewModel.AddSystemMessage("Нет активного звонка");
+                return;
+            }
+
+            MuteButton_Click(sender, e);
+        }
+
+        private void PeerAvatar_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (!_isInCall)
+            {
+                _viewModel.AddSystemMessage("Нет активного звонка");
+                return;
+            }
+
             var contextMenu = new ContextMenu
             {
-                Background = new SolidColorBrush(Color.FromRgb(47, 49, 54)), // #2f3136
-                BorderBrush = new SolidColorBrush(Color.FromRgb(32, 34, 37)), // #202225
+                Background = new SolidColorBrush(Color.FromRgb(47, 49, 54)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(32, 34, 37)),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(8, 4, 8, 4),
                 FontFamily = new FontFamily("Segoe UI"),
-                Foreground = new SolidColorBrush(Color.FromRgb(220, 221, 222)) // #DCDDDE
+                Foreground = new SolidColorBrush(Color.FromRgb(220, 221, 222))
             };
 
-            // Заголовок
             var header = new MenuItem
             {
-                Header = _isPeerMuted ? "🔇 Собеседник заглушен" : $"🔊 Громкость: {_peerVolume * 100:F0}%",
+                Header = _isPeerMuted ? "Собеседник заглушен" : $"Громкость: {_peerVolume * 100:F0}%",
                 IsEnabled = false,
-                Foreground = new SolidColorBrush(Color.FromRgb(185, 187, 190)) // #B9BBBE
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 187, 190))
             };
             contextMenu.Items.Add(header);
             contextMenu.Items.Add(new Separator());
 
-            // Панель с ползунком
-            var sliderPanel = new StackPanel { Margin = new Thickness(10, 8, 10, 8) };
-
-            // ✅ ИСПОЛЬЗУЕМ КРАСИВЫЙ СТИЛЬ
             var slider = new Slider
             {
                 Style = (Style)FindResource("ModernSliderStyle"),
                 Width = 200,
                 Value = _peerVolume * 100,
-                Margin = new Thickness(0, 5, 0, 5)
-            };
-
-            // Текст значения (в стиле уже есть ValueText, но добавим отдельно для надежности)
-            var valueText = new TextBlock
-            {
-                Text = $"{_peerVolume * 100:F0}%",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                FontSize = 11,
-                Foreground = new SolidColorBrush(Color.FromRgb(185, 187, 190)),
-                Margin = new Thickness(0, 5, 0, 0)
+                Margin = new Thickness(10, 8, 10, 8)
             };
 
             slider.ValueChanged += (s, args) =>
             {
-                float volume = (float)(slider.Value / 100);
-                _peerVolume = volume;
-
+                _peerVolume = (float)(slider.Value / 100);
                 if (!_isPeerMuted)
-                {
-                    _voiceCall?.SetSpeakerVolume(volume);
-                }
+                    _voiceCall?.SetSpeakerVolume(_peerVolume);
 
-                valueText.Text = $"{slider.Value:F0}%";
-                header.Header = _isPeerMuted ? "🔇 Собеседник заглушен" : $"🔊 Громкость: {slider.Value:F0}%";
-
-                // Обновляем текст в стиле (если нужно)
-                if (slider.Template?.FindName("ValueText", slider) is TextBlock styleValueText)
-                {
-                    styleValueText.Text = $"{slider.Value:F0}%";
-                }
+                header.Header = _isPeerMuted ? "Собеседник заглушен" : $"Громкость: {slider.Value:F0}%";
             };
 
-            sliderPanel.Children.Add(slider);
-            sliderPanel.Children.Add(valueText);
-
-            var sliderItem = new MenuItem { Header = sliderPanel, StaysOpenOnClick = true };
-            contextMenu.Items.Add(sliderItem);
+            contextMenu.Items.Add(new MenuItem { Header = slider, StaysOpenOnClick = true });
             contextMenu.Items.Add(new Separator());
 
-            // Кнопка заглушить/включить
             var muteItem = new MenuItem
             {
-                Header = _isPeerMuted ? "🎤 Включить звук" : "🔇 Заглушить",
-                Icon = new TextBlock { Text = _isPeerMuted ? "🔊" : "🔇", Margin = new Thickness(0, 0, 5, 0) }
+                Header = _isPeerMuted ? "Включить звук" : "Заглушить"
             };
             muteItem.Click += (s, args) =>
             {
                 _isPeerMuted = !_isPeerMuted;
-
-                if (_isPeerMuted)
-                {
-                    _voiceCall?.SetSpeakerVolume(0);
-                    muteItem.Header = "🎤 Включить звук";
-                    muteItem.Icon = new TextBlock { Text = "🔊", Margin = new Thickness(0, 0, 5, 0) };
-                    slider.Value = 0;
-                    PeerVoiceStatus.Text = "🔇 Заглушен";
-                    PeerVoiceStatus.Foreground = new SolidColorBrush(Color.FromRgb(218, 55, 60));
-                    MessageNotification("🔇 Звук собеседника отключен");
-                }
-                else
-                {
-                    _voiceCall?.SetSpeakerVolume(_peerVolume);
-                    muteItem.Header = "🔇 Заглушить";
-                    muteItem.Icon = new TextBlock { Text = "🔇", Margin = new Thickness(0, 0, 5, 0) };
-                    slider.Value = _peerVolume * 100;
-                    PeerVoiceStatus.Text = "";
-                    MessageNotification($"🔊 Звук собеседника включен ({_peerVolume * 100:F0}%)");
-                }
-
-                header.Header = _isPeerMuted ? "🔇 Собеседник заглушен" : $"🔊 Громкость: {slider.Value:F0}%";
+                _voiceCall?.SetSpeakerVolume(_isPeerMuted ? 0 : _peerVolume);
+                PeerVoiceStatus.Text = _isPeerMuted ? "Заглушен" : "";
+                PeerVoiceStatus.Foreground = new SolidColorBrush(_isPeerMuted
+                    ? Color.FromRgb(218, 55, 60)
+                    : Color.FromRgb(35, 165, 89));
             };
             contextMenu.Items.Add(muteItem);
-
-            contextMenu.Items.Add(new Separator());
-
-            // Кнопка сброса
-            var resetItem = new MenuItem
-            {
-                Header = "↺ Сбросить (100%)",
-                Icon = new TextBlock { Text = "↺", Margin = new Thickness(0, 0, 5, 0) }
-            };
-            resetItem.Click += (s, args) =>
-            {
-                slider.Value = 100;
-                if (!_isPeerMuted)
-                {
-                    _voiceCall?.SetSpeakerVolume(1.0f);
-                }
-                MessageNotification("🔊 Громкость собеседника сброшена до 100%");
-            };
-            contextMenu.Items.Add(resetItem);
-
-            // Стиль для MenuItem
-            foreach (var item in contextMenu.Items)
-            {
-                if (item is MenuItem menuItem && menuItem != header && menuItem != sliderItem)
-                {
-                    menuItem.Background = Brushes.Transparent;
-                    menuItem.Foreground = new SolidColorBrush(Color.FromRgb(220, 221, 222));
-
-                    var template = new ControlTemplate(typeof(MenuItem));
-                    var border = new FrameworkElementFactory(typeof(Border));
-                    border.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
-                    border.SetValue(Border.PaddingProperty, new Thickness(8, 4, 8, 4));
-                    border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(MenuItem.BackgroundProperty));
-
-                    var content = new FrameworkElementFactory(typeof(StackPanel), "Stack");
-                    content.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-
-                    var icon = new FrameworkElementFactory(typeof(ContentPresenter), "Icon");
-                    icon.SetValue(ContentPresenter.ContentProperty, new TemplateBindingExtension(MenuItem.IconProperty));
-                    icon.SetValue(ContentPresenter.MarginProperty, new Thickness(0, 0, 5, 0));
-                    icon.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-
-                    var headerText = new FrameworkElementFactory(typeof(ContentPresenter), "Header");
-                    headerText.SetValue(ContentPresenter.ContentProperty, new TemplateBindingExtension(MenuItem.HeaderProperty));
-                    headerText.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-
-                    content.AppendChild(icon);
-                    content.AppendChild(headerText);
-                    border.AppendChild(content);
-
-                    template.VisualTree = border;
-
-                    var trigger = new Trigger { Property = MenuItem.IsMouseOverProperty, Value = true };
-                    trigger.Setters.Add(new Setter { Property = MenuItem.BackgroundProperty, Value = new SolidColorBrush(Color.FromRgb(64, 68, 75)) });
-                    template.Triggers.Add(trigger);
-
-                    menuItem.Template = template;
-                }
-            }
 
             contextMenu.IsOpen = true;
         }
 
-        /// <summary>
-        /// Кнопка звонка
-        /// </summary>
         private async void CallButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                GenerateVoiceKeys();
+                await GenerateVoiceKeysAsync();
+                _myIP = GetLocalIPAddress();
+                _viewModel.ShowActiveCall();
 
-                // Получаем свой IP
+                _voiceCall = CreateVoiceCall(microphoneEnabled: true);
+                ApplyVoiceKeysIfReady();
+                _voicePort = _voiceCall.BindLocalPort(_voicePort);
                 _myIP = GetLocalIPAddress();
 
-                // Переключаем в режим активного звонка
-                IdleMode.Visibility = Visibility.Collapsed;
-                ActiveMode.Visibility = Visibility.Visible;
-                CallPanel.Height = 100;
-
-                // Инициализируем голос
-                _voiceCall = new SimpleVoiceCall(client, ID);
-                _voiceCall.SetMicrophoneEnabled(true);
-
-                _voiceCall.SetEncryptionKey(_voiceSessionKey, _voiceIV);
-                _voiceCall.SetEncryptionEnabled(_voiceEncryptionEnabled);
-
-                _voiceCall.OnStatusChanged += (msg) => MessageNotification(msg);
-                _voiceCall.OnVolumeChanged += (level) =>
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (level > 0.05f && !_isMuted)
-                        {
-                            MyGlowBorder.Opacity = 0.5 + (level * 0.5);
-                        }
-                        else
-                        {
-                            MyGlowBorder.Opacity = 0;
-                        }
-                    });
-                };
-
-                // Отправляем запрос на звонок через сервер
-                // Нужно добавить метод в WCF сервис
-                client.SendCallRequest(ID, _myIP, _voicePort);
-
-                MessageNotification("📞 Звонок...");
-
-                // Запускаем прием звонка
-                await _voiceCall.AcceptCall(_voicePort);
+                await client.SendCallRequestAsync(ID, _myIP, _voicePort);
                 _isInCall = true;
+                _callTones.PlayOutgoing();
+                _viewModel.AddSystemMessage("Звонок...");
             }
             catch (Exception ex)
             {
-                MessageNotification($"❌ Ошибка: {ex.Message}");
+                _viewModel.AddSystemMessage("Ошибка звонка: " + ex.Message);
+                EndCall();
             }
         }
 
-        /// <summary>
-        /// Кнопка Mute (отключить микрофон)
-        /// </summary>
         private void MuteButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!_isInCall) return;
+            if (!_isInCall)
+                return;
 
             _isMuted = !_isMuted;
-
+            _voiceCall?.SetMute(_isMuted);
+            MuteButton.Content = _isMuted ? "🔇" : "🎤";
+            MuteButton.Background = new SolidColorBrush(_isMuted
+                ? Color.FromRgb(218, 55, 60)
+                : Color.FromRgb(79, 84, 92));
             if (_isMuted)
-            {
-                _voiceCall?.SetMute(true);
-                MuteButton.Content = "🔇";
-                MuteButton.Background = new SolidColorBrush(Color.FromRgb(218, 55, 60));
                 MyGlowBorder.Opacity = 0;
-                MessageNotification("🔇 Микрофон отключен");
-            }
-            else
-            {
-                _voiceCall?.SetMute(false);
-                MuteButton.Content = "🎤";
-                MuteButton.Background = new SolidColorBrush(Color.FromRgb(79, 84, 92));
-                MessageNotification("🎤 Микрофон включен");
-            }
         }
 
-        /// <summary>
-        /// Кнопка завершения звонка
-        /// </summary>
-        private void EndCallButton_Click(object sender, RoutedEventArgs e)
+        private async void EndCallButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!_isInCall) return;
+            if (!_isInCall)
+                return;
 
-            _voiceCall?.HangUp();
-            _isInCall = false;
-            _isMuted = false;
+            try
+            {
+                if (CanTalkToServer)
+                    await client.SendCallEndAsync(ID);
+            }
+            catch
+            {
+            }
 
-            // Возвращаем в режим ожидания
-            IdleMode.Visibility = Visibility.Visible;
-            ActiveMode.Visibility = Visibility.Collapsed;
-            CallPanel.Height = 60;
-
-            MuteButton.Content = "🎤";
-            MuteButton.Background = new SolidColorBrush(Color.FromRgb(79, 84, 92));
-            MyGlowBorder.Opacity = 0;
-            PeerGlowBorder.Opacity = 0;
-
-            MessageNotification("📞 Звонок завершен");
+            EndCall();
+            _viewModel.AddSystemMessage("Звонок завершен");
         }
 
         private string GetLocalIPAddress()
         {
-            // var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
-            // foreach (var ip in host.AddressList)
-            // {
-            //     if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-            //     {
-            //         return ip.ToString();
-            //     }
-            // }
+            try
+            {
+                using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0))
+                {
+                    socket.Connect("8.8.8.8", 65530);
+                    if (socket.LocalEndPoint is IPEndPoint endPoint)
+                        return endPoint.Address.ToString();
+                }
+            }
+            catch
+            {
+            }
 
-            // Для теста на одном ПК используем localhost
             return "127.0.0.1";
         }
 
         public void IncomingCall(int fromUserId, string callerIP, int callerPort)
         {
-            Dispatcher.Invoke(async () =>
+            _incomingCallerIP = callerIP;
+            _incomingCallerPort = callerPort;
+            _viewModel.IsIncomingCallVisible = true;
+            _callTones.PlayIncoming();
+        }
+
+        private async void AcceptIncomingCall_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.IsIncomingCallVisible = false;
+            _callTones.Stop();
+            _viewModel.ShowActiveCall();
+
+            _voiceCall = CreateVoiceCall(microphoneEnabled: true);
+            ApplyVoiceKeysIfReady();
+            _voicePort = _voiceCall.BindLocalPort(_voicePort);
+            _voiceCall.SetRemote(_incomingCallerIP, _incomingCallerPort);
+            _myIP = GetLocalIPAddress();
+
+            try
             {
-                _peerId = fromUserId;
-                _peerIP = callerIP;
+                await client.SendCallAnswerAsync(ID, true, _myIP, _voicePort);
+                _isInCall = true;
+                _voiceCall.BeginLocalAudio();
+                _viewModel.AddSystemMessage("Звонок принят");
+            }
+            catch (Exception ex)
+            {
+                _viewModel.AddSystemMessage("Не удалось принять звонок: " + ex.Message);
+                EndCall();
+            }
+        }
 
-                var result = MessageBox.Show($"Входящий звонок!\n\nПринять?",
-                    "Голосовой звонок",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    GenerateVoiceKeys();
-
-                    IdleMode.Visibility = Visibility.Collapsed;
-                    ActiveMode.Visibility = Visibility.Visible;
-                    CallPanel.Height = 100;
-
-                    _voiceCall = new SimpleVoiceCall(client, ID);
-
-                    _voiceCall.SetEncryptionKey(_voiceSessionKey, _voiceIV);
-
-                    // ✅ Синхронизируем счетчик (начинаем с 0)
-                    _voiceCall.SyncEncryptionCounter(0);
-
-                    _voiceCall.SetEncryptionKey(_voiceSessionKey, _voiceIV);
-                    _voiceCall.SetEncryptionEnabled(_voiceEncryptionEnabled);
-
-                    _voiceCall.SetMicrophoneEnabled(false);
-                    _voiceCall.OnStatusChanged += (msg) => MessageNotification(msg);
-                    _voiceCall.OnVolumeChanged += (level) =>
-                    {
-                        Dispatcher.Invoke(() =>
-                        {
-                            if (level > 0.05f && !_isMuted)
-                                MyGlowBorder.Opacity = 0.5 + (level * 0.5);
-                            else
-                                MyGlowBorder.Opacity = 0;
-                        });
-                    };
-
-                    client.SendCallAnswer(ID, true, _myIP, _voicePort);
-                    await _voiceCall.StartCall(callerIP, callerPort);
-                    _isInCall = true;
-                    MessageNotification("✅ Звонок принят");
-                }
-                else
-                {
-                    client.SendCallAnswer(ID, false, "", 0);
-                }
-            });
+        private async void DeclineIncomingCall_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.IsIncomingCallVisible = false;
+            _callTones.Stop();
+            try
+            {
+                await client.SendCallAnswerAsync(ID, false, "", 0);
+            }
+            catch
+            {
+            }
         }
 
         public void CallAnswered(int fromUserId, bool accept, string answererIP, int answererPort)
         {
-            Dispatcher.Invoke(async () =>
+            if (accept)
             {
-                if (accept)
-                {
-                    _peerIP = answererIP;
-                    if (_voiceCall != null)
-                    {
-                        _voiceCall.SyncEncryptionCounter(0);
-                    }
-                    await _voiceCall.StartCall(answererIP, answererPort);
-                    _isInCall = true;
-                    MessageNotification("✅ Собеседник ответил");
-                }
-                else
-                {
-                    MessageNotification("❌ Собеседник отклонил звонок");
-                    EndCall();
-                }
-            });
+                _callTones.Stop();
+                _isInCall = true;
+                ApplyVoiceKeysIfReady();
+                _voiceCall?.SetRemote(answererIP, answererPort);
+                _voiceCall?.BeginLocalAudio();
+                _viewModel.AddSystemMessage("Собеседник ответил");
+                return;
+            }
+
+            _viewModel.AddSystemMessage("Собеседник отклонил звонок");
+            EndCall();
         }
 
         public void CallEnded(int fromUserId)
         {
-            Dispatcher.Invoke(() =>
-            {
-                MessageNotification("📞 Собеседник завершил звонок");
-                EndCall();
-            });
+            _viewModel.AddSystemMessage("Собеседник завершил звонок");
+            EndCall();
         }
 
         private void EndCall()
         {
+            _callTones.Stop();
             _voiceCall?.HangUp();
+            _voiceCall?.Dispose();
+            _voiceCall = null;
             _isInCall = false;
             _isMuted = false;
-
-            IdleMode.Visibility = Visibility.Visible;
-            ActiveMode.Visibility = Visibility.Collapsed;
-            CallPanel.Height = 60;
+            _viewModel.IsIncomingCallVisible = false;
+            _viewModel.ShowIdleCall();
 
             MuteButton.Content = "🎤";
             MuteButton.Background = new SolidColorBrush(Color.FromRgb(79, 84, 92));
             MyGlowBorder.Opacity = 0;
             PeerGlowBorder.Opacity = 0;
+            PeerVoiceStatus.Text = "";
 
             if (_voiceSessionKey != null)
                 Array.Clear(_voiceSessionKey, 0, _voiceSessionKey.Length);
             if (_voiceIV != null)
                 Array.Clear(_voiceIV, 0, _voiceIV.Length);
+
+            _voiceSessionKey = null;
+            _voiceIV = null;
         }
 
         private int GetPortFromFile()
         {
             try
             {
-                // Если файл существует, читаем порт
-                if (File.Exists(_portFile))
+                if (File.Exists(PortFile))
                 {
-                    string content = File.ReadAllText(_portFile).Trim();
-                    if (int.TryParse(content, out int port))
+                    string content = File.ReadAllText(PortFile).Trim();
+                    if (int.TryParse(content, out int port) && port >= VoicePortMin && port <= VoicePortMax)
                     {
-                        // Если порт в диапазоне 5000-6000, используем его
-                        if (port >= 5000 && port <= 6000)
-                        {
-                            // ✅ Увеличиваем порт на 1 для следующего запуска
-                            int nextPort = port + 1;
-
-                            // Если порт вышел за диапазон, начинаем с 5000
-                            if (nextPort > 6000)
-                            {
-                                nextPort = 5000;
-                            }
-
-                            // Сохраняем следующий порт в файл
-                            File.WriteAllText(_portFile, nextPort.ToString());
-
-                            Console.WriteLine($"📖 Прочитан порт из файла: {port}");
-                            Console.WriteLine($"📝 Следующий порт будет: {nextPort}");
-
-                            return port;
-                        }
+                        int nextPort = port >= VoicePortMax ? VoicePortMin : port + 1;
+                        File.WriteAllText(PortFile, nextPort.ToString());
+                        return port;
                     }
                 }
 
-                // Если файла нет или порт невалидный, создаем новый
-                int newPort = new Random().Next(5000, 6000);
-                int nextNewPort = newPort + 1;
-                if (nextNewPort > 6000) nextNewPort = 5000;
-
-                File.WriteAllText(_portFile, nextNewPort.ToString());
-                Console.WriteLine($"📝 Создан новый порт: {newPort}");
-                Console.WriteLine($"📝 Следующий порт будет: {nextNewPort}");
+                int newPort = new Random().Next(VoicePortMin, VoicePortMax);
+                File.WriteAllText(PortFile, (newPort + 1).ToString());
                 return newPort;
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"❌ Ошибка чтения порта: {ex.Message}");
-                // Если ошибка, возвращаем случайный порт
-                return new Random().Next(5000, 6000);
+                return new Random().Next(VoicePortMin, VoicePortMax);
             }
         }
-        /// <summary>
-        /// Получение голоса от сервера (ретрансляция)
-        /// </summary>
+
         public void ReceiveVoice(int fromUserId, byte[] voiceData)
         {
-            // Получаем голос от сервера и воспроизводим
             _voiceCall?.ReceiveVoice(voiceData);
         }
 
-        /// <summary>
-        /// Генерация ключей для шифрования голоса
-        /// </summary>
-        private void GenerateVoiceKeys()
+        private async Task GenerateVoiceKeysAsync()
         {
-            _voiceSessionKey = new byte[32]; // 256 бит для Кузнечика
-            _voiceIV = new byte[16];         // 128 бит для IV
+            _voiceSessionKey = new byte[32];
+            _voiceIV = new byte[16];
 
             using (var rng = RandomNumberGenerator.Create())
             {
@@ -941,32 +688,41 @@ namespace ChatClient
                 rng.GetBytes(_voiceIV);
             }
 
-            // Отправляем ключи собеседнику через сервер
-            client.SendVoiceKeys(ID, _voiceSessionKey, _voiceIV);
+            if (CanTalkToServer)
+                await client.SendVoiceKeysAsync(ID, _voiceSessionKey, _voiceIV);
         }
 
-        /// <summary>
-        /// Получение ключей шифрования голоса от собеседника
-        /// </summary>
         public void ReceiveVoiceKeys(int fromUserId, byte[] sessionKey, byte[] iv)
         {
-            Dispatcher.Invoke(() =>
-            {
-                _voiceSessionKey = sessionKey;
-                _voiceIV = iv;
+            _voiceSessionKey = sessionKey;
+            _voiceIV = iv;
+            ApplyVoiceKeysIfReady();
+            if (_isInCall)
+                _voiceCall?.BeginLocalAudio();
+        }
 
-                // Если звонок уже активен, обновляем ключи
-                if (_voiceCall != null && _isInCall)
+        private SimpleVoiceCall CreateVoiceCall(bool microphoneEnabled)
+        {
+            var call = new SimpleVoiceCall(client, ID);
+            call.SetMicrophoneEnabled(microphoneEnabled);
+            call.SetEncryptionEnabled(true);
+            call.OnStatusChanged += msg => Dispatcher.BeginInvoke(new Action(() => _viewModel.AddSystemMessage(msg)));
+            call.OnVolumeChanged += level =>
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    _voiceCall.SetEncryptionKey(sessionKey, iv);
-                    MessageNotification("🔐 Ключи шифрования голоса обновлены");
-                }
-                else
-                {
-                    MessageNotification("🔐 Ключи шифрования голоса получены");
-                }
-            });
+                    MyGlowBorder.Opacity = level > 0.05f && !_isMuted ? 0.5 + (level * 0.5) : 0;
+                }));
+            };
+            return call;
+        }
+
+        private void ApplyVoiceKeysIfReady()
+        {
+            if (_voiceCall == null || _voiceSessionKey == null || _voiceIV == null)
+                return;
+
+            _voiceCall.SetEncryptionKey(_voiceSessionKey, _voiceIV);
         }
     }
-
 }

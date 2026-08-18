@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Linq;
-using System.Text;
 using System.Security.Cryptography;
-using System.Diagnostics;
 
 namespace ChatClient.ProtocolSignal
 {
@@ -19,29 +17,22 @@ namespace ChatClient.ProtocolSignal
         // Вычисление HMAC
         public static byte[] ComputeHmac(byte[] key, byte[] data)
         {
-            HMAC hmac = new HMAC(key);
-            return hmac.ComputeHash(data);
+            using (var hmac = new HMACSHA256(key))
+                return hmac.ComputeHash(data);
         }
 
-        // Генерация ключей с использованием SHA-256
         public static void DeriveKeys(byte[] sharedSecret, out byte[] aesKey, out byte[] hmacKey)
         {
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                byte[] hash = sha256.ComputeHash(sharedSecret);
+            if (sharedSecret == null || sharedSecret.Length == 0)
+                throw new ArgumentException("Общий секрет не должен быть пустым.", nameof(sharedSecret));
 
-                var streebog512 = new Streebog(512);
-                var hash512 = streebog512.GetHash(Encoding.UTF8.GetBytes("Hello, Streebog!"));
- 
-                aesKey = new byte[32];
-                hmacKey = new byte[32];
+            var streebog512 = new Streebog(512);
+            byte[] hash512 = streebog512.GetHash(sharedSecret);
 
-                // Первые 32 байта хэша для AES
-                Array.Copy(hash512, 0, aesKey, 0, 32);
-
-                // Следующие 32 байта хэша для HMAC
-                Array.Copy(hash512, 32, hmacKey, 0, 32);
-            }
+            aesKey = new byte[32];
+            hmacKey = new byte[32];
+            Array.Copy(hash512, 0, aesKey, 0, 32);
+            Array.Copy(hash512, 32, hmacKey, 0, 32);
         }
 
         //static void Main()
