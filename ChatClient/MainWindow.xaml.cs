@@ -23,6 +23,7 @@ namespace ChatClient
     public partial class MainWindow : Window
     {
         private ChatHubClient client;
+        private readonly string _hubUrl;
         private readonly MainViewModel _viewModel = new MainViewModel();
         private ECDiffieHellman alice;
         private byte[] aliceSharedSecret;
@@ -71,8 +72,8 @@ namespace ChatClient
             _signature = new GostSignature();
             _signPublicKey = _signature.GetPublicKey();
 
-            string hubUrl = ConfigurationManager.AppSettings["ChatHubUrl"] ?? "http://localhost:5000/chat";
-            client = new ChatHubClient(hubUrl);
+            _hubUrl = ConfigurationManager.AppSettings["ChatHubUrl"] ?? "http://localhost:5000/chat";
+            client = new ChatHubClient(_hubUrl);
             client.GetConnectionAndPublicKey += GetConnectionAndPublicKey;
             client.GetConnectionProtocol += GetConnectionProtocol;
             client.CompareHMAC += CompareHMAC;
@@ -101,7 +102,9 @@ namespace ChatClient
             {
                 _viewModel.IsFindEnabled = false;
                 MessageBox.Show(
-                    "Не удалось подключиться к серверу чата.\nСначала запустите ChatServer (http://localhost:5000).\n\n" + ex.Message,
+                    "Не удалось подключиться к серверу чата.\n" +
+                    "Адрес: " + _hubUrl + "\n\n" +
+                    ex.Message,
                     "Нет соединения",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
