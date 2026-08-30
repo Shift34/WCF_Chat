@@ -6,7 +6,7 @@ namespace ChatClient.ViewModel
 {
     public class MainViewModel : INotifyPropertyChanged
     {
-        private string _statusText = "Состояние: Стандартное";
+        private string _statusText = "Готов к поиску";
         private string _findButtonText = "Найти собеседника";
         private bool _isChatVisible;
         private bool _isCallPanelVisible;
@@ -16,6 +16,8 @@ namespace ChatClient.ViewModel
         private bool _isInputEnabled;
         private bool _isFindEnabled;
         private double _callPanelHeight = 60;
+        private string _directLinkToolTip = string.Empty;
+        private bool _showDirectLinkStatus;
 
         public ObservableCollection<MessageModel> Messages { get; } = new ObservableCollection<MessageModel>();
 
@@ -79,54 +81,69 @@ namespace ChatClient.ViewModel
             set { _callPanelHeight = value; OnPropertyChanged(nameof(CallPanelHeight)); }
         }
 
+        public string DirectLinkToolTip
+        {
+            get => _directLinkToolTip;
+            set { _directLinkToolTip = value ?? string.Empty; OnPropertyChanged(nameof(DirectLinkToolTip)); }
+        }
+
+        public bool ShowDirectLinkStatus
+        {
+            get => _showDirectLinkStatus;
+            set { _showDirectLinkStatus = value; OnPropertyChanged(nameof(ShowDirectLinkStatus)); }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         public void ResetToIdle()
         {
-            StatusText = "Состояние: Стандартное";
+            StatusText = "Готов к поиску";
             FindButtonText = "Найти собеседника";
             IsChatVisible = false;
             IsCallPanelVisible = false;
             IsInputEnabled = false;
             IsIncomingCallVisible = false;
             ShowIdleCall();
+            ClearDirectLinkStatus();
             Messages.Clear();
         }
 
         public void ShowSearching()
         {
-            StatusText = "Состояние: Поиск собеседника";
+            StatusText = "Ищем собеседника…";
             FindButtonText = "Отменить поиск";
         }
 
         public void ShowConnected()
         {
-            StatusText = "Состояние: Ваш собеседник найден";
+            StatusText = "Собеседник на связи";
             FindButtonText = "Отключиться";
             IsChatVisible = true;
-            IsCallPanelVisible = true;
+            IsCallPanelVisible = false;
             IsInputEnabled = true;
             ShowIdleCall();
         }
 
         public void ShowPeerLeft()
         {
-            StatusText = "Состояние: Чат без собеседника";
+            StatusText = "Собеседник отключился";
             IsInputEnabled = false;
             IsCallPanelVisible = false;
             IsIncomingCallVisible = false;
             ShowIdleCall();
+            ClearDirectLinkStatus();
         }
 
         public void ShowProtocolFailed()
         {
-            StatusText = "Состояние: Не удалось установить протокол";
+            StatusText = "Не удалось установить защищённый канал";
             FindButtonText = "Найти собеседника";
             IsChatVisible = false;
             IsCallPanelVisible = false;
             IsInputEnabled = false;
             IsIncomingCallVisible = false;
             ShowIdleCall();
+            ClearDirectLinkStatus();
             Messages.Clear();
         }
 
@@ -134,14 +151,16 @@ namespace ChatClient.ViewModel
         {
             IsCallIdle = true;
             IsCallActive = false;
-            CallPanelHeight = 60;
+            IsCallPanelVisible = false;
+            CallPanelHeight = 0;
         }
 
         public void ShowActiveCall()
         {
             IsCallIdle = false;
             IsCallActive = true;
-            CallPanelHeight = 100;
+            IsCallPanelVisible = true;
+            CallPanelHeight = 0;
         }
 
         public void AddSystemMessage(string text)
@@ -168,6 +187,18 @@ namespace ChatClient.ViewModel
             };
             Messages.Add(message);
             return message;
+        }
+
+        public void SetDirectLinkStatus(string toolTip, bool visible = true)
+        {
+            DirectLinkToolTip = toolTip ?? string.Empty;
+            ShowDirectLinkStatus = visible && DirectLinkToolTip.Length > 0;
+        }
+
+        public void ClearDirectLinkStatus()
+        {
+            DirectLinkToolTip = string.Empty;
+            ShowDirectLinkStatus = false;
         }
 
         protected void OnPropertyChanged(string propertyName)

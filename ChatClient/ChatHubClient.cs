@@ -25,8 +25,10 @@ namespace ChatClient
 
             _connection.On<byte[], byte[]>("GetConnectionAndPublicKey",
                 (publicKey, signPublicKey) => Post(() => GetConnectionAndPublicKey?.Invoke(publicKey, signPublicKey)));
-            _connection.On<bool>("GetConnectionProtocol",
-                state => Post(() => GetConnectionProtocol?.Invoke(state)));
+            _connection.On<bool, int>("GetConnectionProtocol",
+                (state, peerId) => Post(() => GetConnectionProtocol?.Invoke(state, peerId)));
+            _connection.On<string, int>("EstablishDirectLink",
+                (host, port) => Post(() => EstablishDirectLink?.Invoke(host, port)));
             _connection.On<byte[], byte[]>("CompareHMAC",
                 (key, hmac) => Post(() => CompareHMAC?.Invoke(key, hmac)));
             _connection.On("LeftChat",
@@ -52,7 +54,8 @@ namespace ChatClient
         public bool IsConnected => _connection.State == HubConnectionState.Connected;
 
         public event Action<byte[], byte[]> GetConnectionAndPublicKey;
-        public event Action<bool> GetConnectionProtocol;
+        public event Action<bool, int> GetConnectionProtocol;
+        public event Action<string, int> EstablishDirectLink;
         public event Action<byte[], byte[]> CompareHMAC;
         public event Action LeftChat;
         public event Action<string> MessageNotification;
@@ -98,6 +101,15 @@ namespace ChatClient
 
         public Task SendVoiceKeysAsync(int fromUserId, byte[] sessionKey, byte[] iv) =>
             Invoke("SendVoiceKeys", fromUserId, sessionKey, iv);
+
+        public Task RegisterDirectEndpointAsync(int userId, string host, int port) =>
+            Invoke("RegisterDirectEndpoint", userId, host, port);
+
+        public Task NotifyDirectLinkReadyAsync(int userId) =>
+            Invoke("NotifyDirectLinkReady", userId);
+
+        public Task RefreshDirectLinkAsync(int userId) =>
+            Invoke("RefreshDirectLink", userId);
 
         public void Dispose()
         {

@@ -7,47 +7,134 @@
         xmlns:viewmodel="clr-namespace:ChatClient.ViewModel"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance viewmodel:MainViewModel, IsDesignTimeCreatable=True}"
-        Height="500" Width="800"
-        Background="#36393f"
+        Height="700" Width="980"
+        MinHeight="560" MinWidth="760"
+        Background="#12141A"
         WindowStyle="None"
         AllowsTransparency="true"
         ResizeMode="CanResizeWithGrip"
+        FontFamily="Segoe UI"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
         Title="Anonymous Chat" Loaded="Window_Loaded" Closing="Window_Closing">
 
     <Window.Resources>
-        <!-- Конвертер выравнивания -->
         <local:BooleanToAlignmentConverter x:Key="BooleanToAlignmentConverter"/>
-
-        <!-- Конвертер цветов сообщений -->
         <local:OwnMessageColorConverter x:Key="OwnMessageColorConverter"/>
-
         <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <local:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
 
-        <!-- Стиль для кнопки звонка -->
-        <Style x:Key="CallButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#23a559"/>
-            <Setter Property="Foreground" Value="White"/>
+        <Style x:Key="ChromeButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#9AA3B5"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ChromeBg" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ChromeBg" Property="Background" Value="#242833"/>
+                                <Setter Property="Foreground" Value="#F4F6FB"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CloseChromeButtonStyle" TargetType="Button" BasedOn="{StaticResource ChromeButtonStyle}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ChromeBg" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ChromeBg" Property="Background" Value="#E04B55"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MediaIconButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="52"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#B8C0D0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="24"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="IconBg" Background="Transparent" CornerRadius="12">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="#EEF1F7"/>
+                                <Setter TargetName="IconBg" Property="Background" Value="#252A36"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DirectLinkIconStyle" TargetType="Button" BasedOn="{StaticResource MediaIconButtonStyle}">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Foreground" Value="#7C6BF2"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="Focusable" Value="False"/>
+        </Style>
+
+        <Style x:Key="CallButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#3DDC97"/>
+            <Setter Property="Foreground" Value="#082117"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="18,10"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
-                                CornerRadius="8"
+                        <Border x:Name="BtnBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="20"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" 
-                                            VerticalAlignment="Center"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#2dbd66"/>
+                                <Setter TargetName="BtnBorder" Property="Background" Value="#62E8B0"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#1a7a3f"/>
+                                <Setter TargetName="BtnBorder" Property="Background" Value="#2BB87A"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -55,57 +142,266 @@
             </Setter>
         </Style>
 
-        <!-- Стиль для TextBox в стиле Discord -->
-        <Style x:Key="DiscordTextBoxStyle" TargetType="TextBox">
-            <Setter Property="Background" Value="#40444B"/>
-            <Setter Property="Foreground" Value="#DCDDDE"/>
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="FontFamily" Value="Segoe UI, Arial"/>
+        <Style x:Key="SessionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#7C6BF2"/>
+            <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="15,8"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="AcceptsReturn" Value="False"/>
-            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
-            <Setter Property="MinHeight" Value="44"/>
-            <Setter Property="MaxHeight" Value="150"/>
+            <Setter Property="Padding" Value="18,11"/>
+            <Setter Property="MinWidth" Value="188"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Grid>
-                            <Border x:Name="border" 
-                                    Background="{TemplateBinding Background}"
-                                    CornerRadius="8"
-                                    BorderThickness="1"
-                                    BorderBrush="#00000000"
-                                    SnapsToDevicePixels="True">
-                                <ScrollViewer x:Name="PART_ContentHost"
-                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
-                            </Border>
-                            <TextBlock x:Name="placeholderText"
-                                       Text="Написать сообщение..."
-                                       Foreground="#72767D"
-                                       Margin="18,8,15,8"
-                                       FontSize="15"             
-                                       VerticalAlignment="Center"
-                                       IsHitTestVisible="False"
-                                       Visibility="Collapsed"/>
-                        </Grid>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="12"
+                                Padding="{TemplateBinding Padding}"
+                                Opacity="{TemplateBinding Opacity}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="Text" Value="">
-                                <Setter TargetName="placeholderText" Property="Visibility" Value="Visible"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="border" Property="BorderBrush" Value="#383C43"/>
-                            </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#383C43"/>
+                                <Setter TargetName="BtnBorder" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="BtnBorder" Property="Opacity" Value="0.38"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Content" Value="Отменить поиск">
+                    <Setter Property="Background" Value="#F0B429"/>
+                    <Setter Property="Foreground" Value="#1C1403"/>
+                </Trigger>
+                <Trigger Property="Content" Value="Отключиться">
+                    <Setter Property="Background" Value="#E25863"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RoundIconButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Circle"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="32">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Circle" Property="Opacity" Value="0.86"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Circle" Property="Opacity" Value="0.7"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="DiscordVoiceControlButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="52"/>
+            <Setter Property="Background" Value="#4E5058"/>
+            <Setter Property="Foreground" Value="#F2F3F5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="DiscBtn" Background="{TemplateBinding Background}" CornerRadius="26">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="DiscBtn" Property="Background" Value="#6D6F78"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="DiscBtn" Property="Background" Value="#383A40"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DiscordDisconnectButtonStyle" TargetType="Button" BasedOn="{StaticResource DiscordVoiceControlButtonStyle}">
+            <Setter Property="Background" Value="#ED4245"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="DiscBtn" Background="{TemplateBinding Background}" CornerRadius="26">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="DiscBtn" Property="Background" Value="#F26B6D"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="DiscBtn" Property="Background" Value="#C03537"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DiscordHangUpButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="52"/>
+            <Setter Property="Background" Value="#ED4245"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ToolTip" Value="Завершить звонок"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="HangUpBg" Background="{TemplateBinding Background}" CornerRadius="26">
+                            <Grid Width="22" Height="22">
+                                <TextBlock Text="&#xE717;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="17"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           RenderTransformOrigin="0.5,0.5">
+                                    <TextBlock.RenderTransform>
+                                        <RotateTransform Angle="135"/>
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="HangUpBg" Property="Background" Value="#F26B6D"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="HangUpBg" Property="Background" Value="#C03537"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SendMessageButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="48"/>
+            <Setter Property="Width" Value="48"/>
+            <Setter Property="MinHeight" Value="48"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#7C6BF2"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="SendBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="16"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SendBorder" Property="Background" Value="#8F80F5"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="SendBorder" Property="Background" Value="#6758D6"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="SendBorder" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DiscordTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="#232833"/>
+            <Setter Property="Foreground" Value="#F4F6FB"/>
+            <Setter Property="CaretBrush" Value="#C9C2FF"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="AcceptsReturn" Value="False"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="MinHeight" Value="48"/>
+            <Setter Property="MaxHeight" Value="140"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="16"
+                                BorderThickness="1"
+                                BorderBrush="#2C3342"
+                                MinHeight="{TemplateBinding MinHeight}"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <ScrollViewer x:Name="PART_ContentHost"
+                                              Focusable="False"
+                                              Background="Transparent"
+                                              HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Stretch"
+                                              Padding="{TemplateBinding Padding}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              VerticalScrollBarVisibility="Auto"/>
+                                <TextBlock x:Name="placeholderText"
+                                           Text="Написать сообщение"
+                                           Foreground="#7E8798"
+                                           FontSize="15"
+                                           FontFamily="Segoe UI"
+                                           Margin="16,0,16,0"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Left"
+                                           IsHitTestVisible="False"
+                                           Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Text" Value="">
+                                <Setter TargetName="placeholderText" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#7C6BF2"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.45"/>
+                                <Setter TargetName="placeholderText" Property="Text" Value="Собеседник ещё не подключён"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ModernSliderStyle" TargetType="Slider">
             <Setter Property="Height" Value="30"/>
             <Setter Property="Width" Value="180"/>
@@ -113,8 +409,8 @@
             <Setter Property="Maximum" Value="100"/>
             <Setter Property="Orientation" Value="Horizontal"/>
             <Setter Property="IsDirectionReversed" Value="False"/>
-            <Setter Property="Foreground" Value="#23a559"/>
-            <Setter Property="Background" Value="#40444b"/>
+            <Setter Property="Foreground" Value="#7C6BF2"/>
+            <Setter Property="Background" Value="#2C3342"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
@@ -129,22 +425,21 @@
                                        Grid.Column="0"
                                        Text="🔊"
                                        FontSize="12"
-                                       Foreground="#23a559"
+                                       Foreground="#C9C2FF"
                                        VerticalAlignment="Center"
                                        Margin="0,0,8,0"/>
 
                             <Grid Grid.Column="1" Height="16" VerticalAlignment="Center">
                                 <Border Height="4"
-                                        Background="#40444b"
+                                        Background="#2C3342"
                                         CornerRadius="2"
                                         VerticalAlignment="Center"/>
-                                <Track x:Name="PART_Track"
-                                       Orientation="Horizontal">
+                                <Track x:Name="PART_Track" Orientation="Horizontal">
                                     <Track.DecreaseRepeatButton>
                                         <RepeatButton Command="Slider.DecreaseLarge">
                                             <RepeatButton.Template>
                                                 <ControlTemplate TargetType="RepeatButton">
-                                                    <Border Background="#23a559" Height="4" CornerRadius="2" VerticalAlignment="Center"/>
+                                                    <Border Background="#7C6BF2" Height="4" CornerRadius="2" VerticalAlignment="Center"/>
                                                 </ControlTemplate>
                                             </RepeatButton.Template>
                                         </RepeatButton>
@@ -159,13 +454,13 @@
                                         </RepeatButton>
                                     </Track.IncreaseRepeatButton>
                                     <Track.Thumb>
-                                        <Thumb Width="12" Height="12" Cursor="Hand">
+                                        <Thumb Width="14" Height="14" Cursor="Hand">
                                             <Thumb.Template>
                                                 <ControlTemplate TargetType="Thumb">
-                                                    <Border Background="#23a559"
-                                                            BorderBrush="White"
+                                                    <Border Background="#F4F6FB"
+                                                            BorderBrush="#7C6BF2"
                                                             BorderThickness="2"
-                                                            CornerRadius="6"/>
+                                                            CornerRadius="7"/>
                                                 </ControlTemplate>
                                             </Thumb.Template>
                                         </Thumb>
@@ -174,8 +469,8 @@
                             </Grid>
 
                             <TextBlock Grid.Column="2"
-                                       FontSize="10"
-                                       Foreground="#B9BBBE"
+                                       FontSize="11"
+                                       Foreground="#9AA3B5"
                                        VerticalAlignment="Center"
                                        Margin="8,0,0,0"
                                        Text="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, StringFormat={}{0:0}%}"/>
@@ -191,510 +486,678 @@
         </Style>
     </Window.Resources>
 
-    <Grid x:Name="Grid">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="25"/>
-            <RowDefinition Height="75"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="75"/>
-        </Grid.RowDefinitions>
+    <Border BorderBrush="#2A3040" BorderThickness="1">
+        <Grid x:Name="Grid">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <!-- Заголовок -->
-        <Border Grid.Row="0"
-                Background="#252525"
-                MouseDown="Border_MouseDown">
-            <Grid HorizontalAlignment="Stretch">
-                <Label Content="Anonymous Chat"
-                       Foreground="Gray"
-                       FontWeight="SemiBold"/>
-                <StackPanel HorizontalAlignment="Right"
-                            Orientation="Horizontal">
-                    <Button Width="20" Height="20"
-                            Content="🗕"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Foreground="Gray"
-                            FontWeight="Bold"
-                            Margin="0,0,0,2"
-                            Click="ButtonMinizime_Click"/>
-                    <Button Width="20" Height="20"
-                            Content="❐"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Foreground="Gray"
-                            FontWeight="Bold"
-                            Click="WindowButtonState_Click"/>
-                    <Button Width="20" Height="20"
-                            Content="✕"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Foreground="Gray"
-                            FontWeight="Bold"
-                            Click="CloseButton_Click"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- Статус и кнопка поиска -->
-        <Grid Background="#36393f" Grid.Row="1">
-            <Grid HorizontalAlignment="Stretch">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="33*"/>
-                    <ColumnDefinition Width="33*"/>
-                    <ColumnDefinition Width="33*"/>
-                </Grid.ColumnDefinitions>
-
-                <Label x:Name="LabelState" 
-                       Grid.Column="0"
-                       Content="{Binding StatusText}"
-                       HorizontalContentAlignment="Center" 
-                       VerticalContentAlignment="Center"
-                       Height="75"
-                       Foreground="LawnGreen"
-                       FontWeight="SemiBold" 
-                       FontFamily="Arial"/>
-
-                <StackPanel Grid.Column="1"
-                            HorizontalAlignment="Stretch" 
-                            Height="75">
-                    <Button x:Name="Button1" 
-                            HorizontalAlignment="Stretch"
-                            HorizontalContentAlignment="Center"
-                            Height="75"  
-                            Content="{Binding FindButtonText}"
-                            IsEnabled="{Binding IsFindEnabled}"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Foreground="NavajoWhite"
-                            FontWeight="Bold"
-                            Click="ButtonFindAndCancelAndDisconnect_Click" 
-                            FontSize="16" 
-                            FontFamily="Arial"/>
-                </StackPanel>
-
-                <Label x:Name="LabelTypeEncryption" 
-                       Grid.Column="2"
-                       Content="Протокол Signal"
-                       HorizontalContentAlignment="Center" 
-                       VerticalContentAlignment="Center"
-                       Height="75"
-                       Foreground="FloralWhite"
-                       FontWeight="SemiBold" 
-                       FontFamily="Arial"/>
-            </Grid>
-        </Grid>
-
-        <!-- Панель звонка (над сообщениями) -->
-        <Border x:Name="CallPanel" 
-                Grid.Row="2"
-                Background="#2f3136"
-                BorderThickness="0,0,0,1"
-                BorderBrush="#202225"
-                Height="{Binding CallPanelHeight}"
-                Visibility="{Binding IsCallPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-
-            <!-- ОБЕРТКА: один корневой элемент для Border -->
-            <Grid>
-                <!-- РЕЖИМ 1: ТОЛЬКО КНОПКА "ПОЗВОНИТЬ" -->
-                <Grid x:Name="IdleMode" 
-                      Margin="12,8"
-                      Visibility="{Binding IsCallIdle, Converter={StaticResource BooleanToVisibilityConverter}}">
-
-                    <Button x:Name="CallButton" 
-                            Content="📞 Позвонить"
-                            Style="{StaticResource CallButtonStyle}"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Click="CallButton_Click"/>
-                </Grid>
-
-                <!-- РЕЖИМ 2: АКТИВНЫЙ ЗВОНОК (два кружка + кнопки) -->
-                <Grid x:Name="ActiveMode" 
-                      Margin="12,8"
-                      Visibility="{Binding IsCallActive, Converter={StaticResource BooleanToVisibilityConverter}}">
-
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <!-- 0: свой аватар -->
-                        <ColumnDefinition Width="Auto"/>
-                        <!-- 1: свой статус -->
-                        <ColumnDefinition Width="*"/>
-                        <!-- 2: кнопки управления -->
-                        <ColumnDefinition Width="Auto"/>
-                        <!-- 3: статус собеседника -->
-                        <ColumnDefinition Width="Auto"/>
-                        <!-- 4: аватар собеседника -->
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Левый круг (свой аватар) - колонка 0 -->
-                    <Border x:Name="MyAvatarBorder" 
-            Grid.Column="0"
-            Width="56" Height="56"
-            CornerRadius="28"
-            Background="#40444b"
-            Margin="0,0,12,0"
-            Cursor="Hand"
-            MouseRightButtonUp="MyAvatar_MouseRightButtonUp">
-                        <Grid>
-                            <Border x:Name="MyGlowBorder" 
-                    Width="62" Height="62"
-                    CornerRadius="31"
-                    Background="Transparent"
-                    BorderThickness="3"
-                    BorderBrush="#23a559"
-                    Opacity="0"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    IsHitTestVisible="False">
-                                <Border.RenderTransform>
-                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
-                                </Border.RenderTransform>
-                            </Border>
-                            <TextBlock x:Name="MyAvatarIcon" 
-                       Text="🎤" 
-                       FontSize="28" 
-                       HorizontalAlignment="Center" 
-                       VerticalAlignment="Center"
-                       Foreground="White"/>
-                        </Grid>
-                    </Border>
-
-                    <!-- Свой статус (ВЫ) - колонка 1 -->
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
-                        <TextBlock Text="ВЫ" 
-                   Foreground="#B9BBBE"
-                   FontSize="11"
-                   Margin="0,0,0,2"/>
-                        <TextBlock x:Name="MyStatusText" 
-                   Text="● Готов"
-                   Foreground="#23a559"
-                   FontSize="12"/>
-                    </StackPanel>
-
-                    <!-- Центральная часть: кнопки управления - колонка 2 -->
-                    <StackPanel Grid.Column="2" 
-                HorizontalAlignment="Center" 
-                VerticalAlignment="Center"
-                Orientation="Horizontal">
-
-                        <Button x:Name="MuteButton" 
-                Width="40" Height="40"
-                Content="🎤"
-                Background="#4f545c"
-                Foreground="White"
-                BorderThickness="0"
-                Cursor="Hand"
-                Margin="10"
-                Click="MuteButton_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}"
-                            CornerRadius="20"
-                            Padding="10">
-                                        <ContentPresenter HorizontalAlignment="Center" 
-                                          VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-
-                        <Button x:Name="EndCallButton" 
-                Width="40" Height="40"
-                Content="🔴"
-                Background="#da373c"
-                Foreground="White"
-                BorderThickness="0"
-                Cursor="Hand"
-                Margin="10"
-                Click="EndCallButton_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}"
-                            CornerRadius="20"
-                            Padding="10">
-                                        <ContentPresenter HorizontalAlignment="Center" 
-                                          VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                    </StackPanel>
-
-                    <!-- Статус собеседника - колонка 3 -->
-                    <StackPanel Grid.Column="3" 
-                                VerticalAlignment="Center" 
-                                Margin="12,0,12,0"
-                                HorizontalAlignment="Right">
-                        <!-- ← Добавить -->
-                        <TextBlock x:Name="PeerNameText" 
-                                   Text="Собеседник"
-                                   Foreground="White"
+            <Border Grid.Row="0"
+                    Background="#161920"
+                    MouseDown="Border_MouseDown"
+                    BorderBrush="#242833"
+                    BorderThickness="0,0,0,1">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+                        <Border Width="22" Height="22" CornerRadius="7" Background="#7C6BF2" Margin="0,0,10,0">
+                            <TextBlock Text="&#xE72E;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="11"
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Анонимный чат"
+                                   Foreground="#F4F6FB"
                                    FontSize="13"
                                    FontWeight="SemiBold"
-                                   HorizontalAlignment="Right"/>
-                        <TextBlock x:Name="PeerVoiceStatus" 
-                                   Text=""
-                                   Foreground="#23a559"
-                                   FontSize="11"
-                                   HorizontalAlignment="Right"/>
-                        <!-- ← Добавить -->
+                                   VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- Правый круг (аватар собеседника) - колонка 4 -->
-                    <Border x:Name="PeerAvatarBorder" 
-            Grid.Column="4"
-            Width="56" Height="56"
-            CornerRadius="28"
-            Background="#40444b"
-            Margin="12,0,0,0"
-            Cursor="Hand"
-            MouseRightButtonUp="PeerAvatar_MouseRightButtonUp">
-                        <Grid>
-                            <Border x:Name="PeerGlowBorder" 
-                    Width="62" Height="62"
-                    CornerRadius="31"
-                    Background="Transparent"
-                    BorderThickness="3"
-                    BorderBrush="#23a559"
-                    Opacity="0"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    IsHitTestVisible="False">
-                                <Border.RenderTransform>
-                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
-                                </Border.RenderTransform>
-                            </Border>
-                            <TextBlock x:Name="PeerAvatarIcon" 
-                       Text="👤" 
-                       FontSize="28" 
-                       HorizontalAlignment="Center" 
-                       VerticalAlignment="Center"
-                       Foreground="White"/>
-                        </Grid>
-                    </Border>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource ChromeButtonStyle}"
+                                Content="&#xE921;"
+                                Click="ButtonMinizime_Click"
+                                ToolTip="Свернуть"/>
+                        <Button Style="{StaticResource ChromeButtonStyle}"
+                                Content="&#xE922;"
+                                Click="WindowButtonState_Click"
+                                ToolTip="Развернуть"/>
+                        <Button Style="{StaticResource CloseChromeButtonStyle}"
+                                Content="&#xE8BB;"
+                                Click="CloseButton_Click"
+                                ToolTip="Закрыть"/>
+                    </StackPanel>
                 </Grid>
-            </Grid>
-        </Border>
+            </Border>
 
-        <!-- Список сообщений -->
-        <Grid Background="#36393f" Grid.Row="3">
-            <ListView x:Name="ListViewMessage" 
-                      ItemsSource="{Binding Messages}"
-                      Visibility="{Binding IsChatVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
-                      Margin="8,0,8,0"
-                      Padding="0"
-                      Background="Transparent"
-                      BorderThickness="0"
-                      HorizontalContentAlignment="Stretch"
-                      ScrollViewer.VerticalScrollBarVisibility="Visible"
-                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                      VirtualizingPanel.ScrollUnit="Pixel"
-                      VirtualizingPanel.IsVirtualizing="True">
-
-                <ListView.Resources>
-
-                    <!-- ScrollBar стиль -->
-                    <Style TargetType="ScrollBar">
-                        <Setter Property="Background" Value="Transparent"/>
-                        <Style.Triggers>
-                            <Trigger Property="Orientation" Value="Vertical">
-                                <Setter Property="Width" Value="8"/>
-                                <Setter Property="MinWidth" Value="8"/>
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ScrollBar">
-                                            <Grid Background="Transparent">
-                                                <Track x:Name="PART_Track"
-                                                       IsDirectionReversed="True"
-                                                       Orientation="Vertical">
-                                                    <Track.DecreaseRepeatButton>
-                                                        <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0"/>
-                                                    </Track.DecreaseRepeatButton>
-                                                    <Track.IncreaseRepeatButton>
-                                                        <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0"/>
-                                                    </Track.IncreaseRepeatButton>
-                                                    <Track.Thumb>
-                                                        <Thumb>
-                                                            <Thumb.Template>
-                                                                <ControlTemplate TargetType="Thumb">
-                                                                    <Border x:Name="ThumbBorder"
-                                                                            Background="#B9BBBE"
-                                                                            CornerRadius="4"/>
-                                                                    <ControlTemplate.Triggers>
-                                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                                            <Setter TargetName="ThumbBorder" Property="Background" Value="#5865F2"/>
-                                                                        </Trigger>
-                                                                        <Trigger Property="IsDragging" Value="True">
-                                                                            <Setter TargetName="ThumbBorder" Property="Background" Value="#4752C4"/>
-                                                                        </Trigger>
-                                                                    </ControlTemplate.Triggers>
-                                                                </ControlTemplate>
-                                                            </Thumb.Template>
-                                                        </Thumb>
-                                                    </Track.Thumb>
-                                                </Track>
-                                            </Grid>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-
-                </ListView.Resources>
-
-                <ListView.ItemContainerStyle>
-                    <Style TargetType="ListViewItem">
-                        <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="Padding" Value="0"/>
-                        <Setter Property="Margin" Value="0,4"/>
-                        <Setter Property="HorizontalAlignment" Value="Stretch"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        <Setter Property="Width" Value="{Binding ViewportWidth, RelativeSource={RelativeSource AncestorType=ScrollViewer}}"/>
-                        <Setter Property="Focusable" Value="False"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="ListViewItem">
-                                    <ContentPresenter Content="{TemplateBinding Content}"
-                                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Stretch"/>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="Transparent"/>
-                                <Setter Property="BorderBrush" Value="Transparent"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="Transparent"/>
-                                <Setter Property="BorderBrush" Value="Transparent"/>
-                            </Trigger>
-                            <Trigger Property="IsFocused" Value="True">
-                                <Setter Property="Background" Value="Transparent"/>
-                                <Setter Property="BorderBrush" Value="Transparent"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </ListView.ItemContainerStyle>
-
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <Grid HorizontalAlignment="Stretch">
-                            <Border Background="#40444B"
-                                    CornerRadius="15"
-                                    Padding="15,8"
-                                    HorizontalAlignment="Center"
-                                    MaxWidth="400"
-                                    Margin="0,10"
-                                    Visibility="{Binding IsSystemMessage, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock Text="{Binding Text}"
-                                           Foreground="#AAAAAA"
-                                           FontSize="12"
-                                           FontStyle="Italic"
-                                           HorizontalAlignment="Center"/>
-                            </Border>
-
-                            <Border CornerRadius="12"
-                                    MaxWidth="350"
-                                    Padding="10,6"
-                                    Margin="8,2"
-                                    HorizontalAlignment="{Binding IsOwnMessage, Converter={StaticResource BooleanToAlignmentConverter}}"
-                                    Background="{Binding IsOwnMessage, Converter={StaticResource OwnMessageColorConverter}}"
-                                    Visibility="{Binding IsSystemMessage, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Text}"
-                                               TextWrapping="Wrap"
-                                               TextAlignment="Left"
-                                               Foreground="White"
-                                               FontSize="14"/>
-                                    <StackPanel Orientation="Horizontal"
-                                                HorizontalAlignment="Right"
-                                                Margin="0,4,0,0">
-                                        <TextBlock Text="{Binding Time}"
-                                                   FontSize="10"
-                                                   Foreground="#CCCCCC"
-                                                   Margin="0,0,5,0"/>
-                                        <TextBlock Text="{Binding StatusIcon}"
-                                                   FontSize="10"
-                                                   Foreground="{Binding StatusColor}"
-                                                   Visibility="{Binding IsOwnMessage, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-        </Grid>
-
-        <!-- Поле ввода -->
-        <Grid Background="#36393f" Grid.Row="4">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition/>
-            </Grid.ColumnDefinitions>
-            <Border Background="#36393F" 
-                    Padding="16,0,16,16">
+            <Border Grid.Row="1" Background="#161920" Padding="22,16,22,14">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="СЕССИЯ"
+                                   Foreground="#7E8798"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,6"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" Fill="#3DDC97" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Label x:Name="LabelState"
+                                   Content="{Binding StatusText}"
+                                   Padding="0"
+                                   Foreground="#F4F6FB"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"/>
+                            <Button Style="{StaticResource DirectLinkIconStyle}"
+                                    Content="&#xE71B;"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding ShowDirectLinkStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Button.ToolTip>
+                                    <ToolTip Content="{Binding DirectLinkToolTip}" MaxWidth="320"/>
+                                </Button.ToolTip>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Button x:Name="CallButton"
+                                Content="&#xE717;"
+                                Style="{StaticResource MediaIconButtonStyle}"
+                                Margin="0,0,4,0"
+                                Visibility="{Binding IsChatVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                IsEnabled="{Binding IsInputEnabled}"
+                                Click="CallButton_Click">
+                            <Button.ToolTip>
+                                <ToolTip Content="Позвонить"/>
+                            </Button.ToolTip>
+                        </Button>
+                        <Button x:Name="VideoButton"
+                                Content="&#xE714;"
+                                Style="{StaticResource MediaIconButtonStyle}"
+                                Margin="0,0,12,0"
+                                Visibility="{Binding IsChatVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                IsEnabled="{Binding IsInputEnabled}"
+                                Click="VideoButton_Click">
+                            <Button.ToolTip>
+                                <ToolTip Content="Видеозвонок"/>
+                            </Button.ToolTip>
+                        </Button>
+                        <Button x:Name="Button1"
+                                Style="{StaticResource SessionButtonStyle}"
+                                Content="{Binding FindButtonText}"
+                                IsEnabled="{Binding IsFindEnabled}"
+                                Click="ButtonFindAndCancelAndDisconnect_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="2"
+                    x:Name="CallPanel"
+                    Background="#1E1F22"
+                    BorderBrush="#3F4147"
+                    BorderThickness="0,1,0,1"
+                    Visibility="{Binding IsCallActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid MinHeight="220">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" MinHeight="140"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="16,14,16,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Grid Grid.Column="0" Margin="0,0,6,0">
+                            <Border x:Name="MyParticipantTile"
+                                    Background="#35373C"
+                                    CornerRadius="10"
+                                    ClipToBounds="True"
+                                    Cursor="Hand"
+                                    MouseRightButtonUp="MyAvatar_MouseRightButtonUp">
+                                <Grid>
+                                    <Image x:Name="LocalVideoImage"
+                                           Stretch="UniformToFill"
+                                           Visibility="Collapsed"/>
+                                    <Border x:Name="MyAvatarBorder"
+                                            Width="80" Height="80"
+                                            CornerRadius="40"
+                                            Background="#5865F2"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center">
+                                        <TextBlock x:Name="MyAvatarIcon"
+                                                   Text="&#xE77B;"
+                                                   FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="32"
+                                                   Foreground="#F2F3F5"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <Border VerticalAlignment="Bottom"
+                                            HorizontalAlignment="Left"
+                                            Margin="10,0,10,10"
+                                            Background="#B3111114"
+                                            CornerRadius="6"
+                                            Padding="8,4">
+                                        <StackPanel>
+                                            <TextBlock Text="Вы"
+                                                       Foreground="#F2F3F5"
+                                                       FontSize="13"
+                                                       FontWeight="SemiBold"/>
+                                            <TextBlock x:Name="MyStatusText"
+                                                       Foreground="#949BA4"
+                                                       FontSize="10"
+                                                       Margin="0,2,0,0"
+                                                       Visibility="Collapsed"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <Border x:Name="MyGlowBorder"
+                                    CornerRadius="10"
+                                    BorderBrush="#23A559"
+                                    BorderThickness="3"
+                                    Opacity="0"
+                                    IsHitTestVisible="False"/>
+                        </Grid>
+
+                        <Grid Grid.Column="1" Margin="6,0,0,0">
+                            <Border x:Name="PeerParticipantTile"
+                                    Background="#3C4A3E"
+                                    CornerRadius="10"
+                                    ClipToBounds="True"
+                                    Cursor="Hand"
+                                    MouseRightButtonUp="PeerAvatar_MouseRightButtonUp"
+                                    ToolTip="ПКМ: громкость и заглушить">
+                                <Grid>
+                                    <Image x:Name="RemoteVideoImage"
+                                           Stretch="UniformToFill"
+                                           Visibility="Collapsed"/>
+                                    <Border x:Name="PeerAvatarBorder"
+                                            Width="80" Height="80"
+                                            CornerRadius="40"
+                                            Background="#3F4147"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center">
+                                        <TextBlock x:Name="PeerAvatarIcon"
+                                                   Text="&#xE77B;"
+                                                   FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="32"
+                                                   Foreground="#DBDEE1"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <Border VerticalAlignment="Bottom"
+                                            HorizontalAlignment="Left"
+                                            Margin="10,0,10,10"
+                                            Background="#B3111114"
+                                            CornerRadius="6"
+                                            Padding="8,4">
+                                        <StackPanel>
+                                            <TextBlock x:Name="PeerNameText"
+                                                       Text="Собеседник"
+                                                       Foreground="#F2F3F5"
+                                                       FontSize="13"
+                                                       FontWeight="SemiBold"/>
+                                            <TextBlock x:Name="PeerVoiceStatus"
+                                                       Text="В голосовом чате"
+                                                       Foreground="#949BA4"
+                                                       FontSize="10"
+                                                       Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <Border x:Name="PeerGlowBorder"
+                                    CornerRadius="10"
+                                    BorderBrush="#23A559"
+                                    BorderThickness="3"
+                                    Opacity="0"
+                                    IsHitTestVisible="False"/>
+                        </Grid>
+                    </Grid>
+
+                    <StackPanel Grid.Row="1"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Margin="0,4,0,14">
+                        <Button x:Name="CallStageCameraButton"
+                                Content="&#xE714;"
+                                Style="{StaticResource DiscordVoiceControlButtonStyle}"
+                                Margin="4,0"
+                                Click="CallStageCameraButton_Click"
+                                ToolTip="Камера"/>
+                        <Button x:Name="MuteButton"
+                                Content="&#xE720;"
+                                Style="{StaticResource DiscordVoiceControlButtonStyle}"
+                                Margin="4,0"
+                                Click="MuteButton_Click"
+                                ToolTip="Микрофон"/>
+                        <Button x:Name="EndCallButton"
+                                Style="{StaticResource DiscordHangUpButtonStyle}"
+                                Margin="4,0"
+                                Click="EndCallButton_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="3" Background="#12141A">
+                <Grid x:Name="VideoOverlay"
+                      Panel.ZIndex="15"
+                      Visibility="Collapsed"
+                      Background="#FF1E1F22">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Padding="20,16,20,12" Background="#111214">
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Видеозвонок"
+                                           Foreground="#949BA4"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="Собеседник"
+                                           Foreground="#F2F3F5"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
+                                       Text="P2P · ГОСТ"
+                                       Foreground="#5865F2"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"/>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="1" Background="#000000">
+                        <Image x:Name="OverlayRemoteVideoImage" Stretch="Uniform"/>
+                        <Border HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom"
+                                Margin="24"
+                                Width="240"
+                                Height="135"
+                                CornerRadius="8"
+                                Background="#2B2D31"
+                                BorderBrush="#1E1F22"
+                                BorderThickness="3">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.5" Color="#000000"/>
+                            </Border.Effect>
+                            <Grid>
+                                <Image x:Name="OverlayLocalVideoImage" Stretch="Uniform"/>
+                                <Border VerticalAlignment="Bottom" Background="#99000000" Padding="8,4">
+                                    <TextBlock Text="Вы"
+                                               Foreground="#F2F3F5"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <Border Grid.Row="2" Padding="0,16,0,24" HorizontalAlignment="Center">
+                        <Border Background="#111214"
+                                CornerRadius="32"
+                                Padding="10,8"
+                                BorderBrush="#3F4147"
+                                BorderThickness="1">
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="VideoMuteButton"
+                                        Content="&#xE720;"
+                                        Style="{StaticResource DiscordVoiceControlButtonStyle}"
+                                        Margin="4,0"
+                                        Click="MuteButton_Click"
+                                        ToolTip="Микрофон"/>
+                                <Button Content="&#xE714;"
+                                        Style="{StaticResource DiscordVoiceControlButtonStyle}"
+                                        Margin="4,0"
+                                        Click="EndVideoButton_Click"
+                                        ToolTip="Выключить камеру"/>
+                                <Button Style="{StaticResource DiscordHangUpButtonStyle}"
+                                        Margin="4,0"
+                                        Click="EndVideoButton_Click"
+                                        ToolTip="Завершить видеозвонок"/>
+                            </StackPanel>
+                        </Border>
+                    </Border>
+                </Grid>
+
+                <StackPanel VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            MaxWidth="420"
+                            Margin="32"
+                            Visibility="{Binding IsChatVisible, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                    <Border Width="72" Height="72"
+                            CornerRadius="24"
+                            Background="#1C212C"
+                            BorderBrush="#2A3040"
+                            BorderThickness="1"
+                            HorizontalAlignment="Center">
+                        <TextBlock Text="&#xE72E;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="28"
+                                   Foreground="#7C6BF2"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Здесь пока пусто"
+                               Foreground="#F4F6FB"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               Margin="0,18,0,8"/>
+                    <TextBlock Text="Найдите собеседника. Сообщения и голос шифруются на вашем устройстве, сервер видит только зашифрованные данные."
+                               Foreground="#8B93A7"
+                               FontSize="14"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               LineHeight="21"/>
+                </StackPanel>
+
+                <ListView x:Name="ListViewMessage"
+                          ItemsSource="{Binding Messages}"
+                          Visibility="{Binding IsChatVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                          Margin="12,8,12,0"
+                          Padding="8,4"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          HorizontalContentAlignment="Stretch"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          ScrollViewer.CanContentScroll="False"
+                          VirtualizingPanel.ScrollUnit="Pixel"
+                          VirtualizingPanel.IsVirtualizing="True">
+                    <ListView.Resources>
+                        <Style TargetType="ScrollBar">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Style.Triggers>
+                                <Trigger Property="Orientation" Value="Vertical">
+                                    <Setter Property="Width" Value="8"/>
+                                    <Setter Property="MinWidth" Value="8"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ScrollBar">
+                                                <Grid Background="Transparent" Margin="0,6">
+                                                    <Track x:Name="PART_Track"
+                                                           Orientation="Vertical"
+                                                           IsDirectionReversed="True"
+                                                           Minimum="{TemplateBinding Minimum}"
+                                                           Maximum="{TemplateBinding Maximum}"
+                                                           Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                                           ViewportSize="{TemplateBinding ViewportSize}">
+                                                        <Track.DecreaseRepeatButton>
+                                                            <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False"/>
+                                                        </Track.DecreaseRepeatButton>
+                                                        <Track.IncreaseRepeatButton>
+                                                            <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False"/>
+                                                        </Track.IncreaseRepeatButton>
+                                                        <Track.Thumb>
+                                                            <Thumb>
+                                                                <Thumb.Template>
+                                                                    <ControlTemplate TargetType="Thumb">
+                                                                        <Border x:Name="ThumbBorder" Background="#3A4254" CornerRadius="4" Margin="1,0"/>
+                                                                        <ControlTemplate.Triggers>
+                                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                                <Setter TargetName="ThumbBorder" Property="Background" Value="#7C6BF2"/>
+                                                                            </Trigger>
+                                                                            <Trigger Property="IsDragging" Value="True">
+                                                                                <Setter TargetName="ThumbBorder" Property="Background" Value="#6758D6"/>
+                                                                            </Trigger>
+                                                                        </ControlTemplate.Triggers>
+                                                                    </ControlTemplate>
+                                                                </Thumb.Template>
+                                                            </Thumb>
+                                                        </Track.Thumb>
+                                                    </Track>
+                                                </Grid>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListView.Resources>
+
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0,3"/>
+                            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Focusable" Value="False"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <ContentPresenter Content="{TemplateBinding Content}"
+                                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                          HorizontalAlignment="Stretch"/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Border Background="#1C212C"
+                                        CornerRadius="14"
+                                        Padding="14,7"
+                                        HorizontalAlignment="Center"
+                                        MaxWidth="460"
+                                        Margin="0,6"
+                                        Visibility="{Binding IsSystemMessage, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <TextBlock Text="{Binding Text}"
+                                               Foreground="#9AA3B5"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"
+                                               TextAlignment="Center"/>
+                                </Border>
+
+                                <Border CornerRadius="18"
+                                        MaxWidth="460"
+                                        Padding="10,8,10,6"
+                                        Margin="6,2"
+                                        HorizontalAlignment="{Binding IsOwnMessage, Converter={StaticResource BooleanToAlignmentConverter}}"
+                                        Background="{Binding IsOwnMessage, Converter={StaticResource OwnMessageColorConverter}}"
+                                        Visibility="{Binding IsSystemMessage, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                    <Grid>
+                                        <TextBlock Text="{Binding Text}"
+                                                   TextWrapping="Wrap"
+                                                   TextAlignment="Left"
+                                                   Foreground="White"
+                                                   FontSize="14.5"
+                                                   LineHeight="20"
+                                                   Margin="0,0,0,16"/>
+                                        <TextBlock Text="{Binding Time}"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Bottom"
+                                                   FontSize="10.5"
+                                                   Foreground="#D5D8E6"
+                                                   Opacity="0.72"
+                                                   Margin="12,0,0,0"/>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
+
+            <Border Grid.Row="4" Background="#12141A" Padding="16,10,16,14">
+                <Grid Visibility="{Binding IsChatVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBox x:Name="TextBoxMessage"
                              Style="{StaticResource DiscordTextBoxStyle}"
-                             Visibility="{Binding IsChatVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                             VerticalAlignment="Stretch"
                              IsEnabled="{Binding IsInputEnabled}"
-                             PreviewKeyDown="TextBox_PreviewKeyDown"/>
+                             PreviewKeyDown="TextBox_PreviewKeyDown"
+                             TextChanged="TextBoxMessage_TextChanged"/>
+                    <Button Grid.Column="1"
+                            Content="&#xE724;"
+                            Style="{StaticResource SendMessageButtonStyle}"
+                            Margin="10,0,0,0"
+                            Height="{Binding ActualHeight, ElementName=TextBoxMessage}"
+                            Click="SendButton_Click"
+                            ToolTip="Отправить"
+                            IsEnabled="{Binding IsInputEnabled}"/>
                 </Grid>
             </Border>
-        </Grid>
 
-        <Grid Grid.RowSpan="5"
-              Panel.ZIndex="20"
-              Background="#99000000"
-              Visibility="{Binding IsIncomingCallVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <Border Background="#2f3136"
-                    CornerRadius="12"
-                    Padding="28,24"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    BorderBrush="#202225"
-                    BorderThickness="1">
-                <StackPanel>
-                    <TextBlock Text="Входящий звонок"
-                               Foreground="White"
-                               FontSize="18"
+            <Grid Grid.RowSpan="5"
+                  Panel.ZIndex="20"
+                  Visibility="{Binding IsIncomingCallVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.Background>
+                    <SolidColorBrush Color="#0A0B0D" Opacity="0.88"/>
+                </Grid.Background>
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <Grid Width="120" Height="120" Margin="0,0,0,8">
+                        <Ellipse Width="116" Height="116" Stroke="#5865F2" StrokeThickness="2" Opacity="0.25">
+                            <Ellipse.Triggers>
+                                <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                             From="1" To="1.35" Duration="0:0:1.4"/>
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                             From="1" To="1.35" Duration="0:0:1.4"/>
+                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                             From="0.45" To="0" Duration="0:0:1.4"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Ellipse.Triggers>
+                            <Ellipse.RenderTransform>
+                                <ScaleTransform CenterX="58" CenterY="58"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <Border Width="96" Height="96"
+                                CornerRadius="48"
+                                Background="#5865F2"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                            <TextBlock Text="&#xE77B;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="40"
+                                       Foreground="#F2F3F5"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                    <TextBlock Text="Собеседник"
+                               Foreground="#F2F3F5"
+                               FontSize="24"
                                FontWeight="SemiBold"
                                HorizontalAlignment="Center"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0">
-                        <Button Content="Принять"
-                                Style="{StaticResource CallButtonStyle}"
-                                Margin="8,0"
-                                Click="AcceptIncomingCall_Click"/>
-                        <Button Content="Отклонить"
-                                Margin="8,0"
-                                Padding="12,8"
-                                Foreground="White"
-                                Background="#da373c"
-                                BorderThickness="0"
-                                Cursor="Hand"
-                                FontWeight="SemiBold"
-                                Click="DeclineIncomingCall_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}"
-                                            CornerRadius="8"
-                                            Padding="{TemplateBinding Padding}">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
+                    <TextBlock Text="Входящий голосовой звонок…"
+                               Foreground="#949BA4"
+                               FontSize="14"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"/>
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Margin="0,36,0,0">
+                        <StackPanel Margin="20,0" HorizontalAlignment="Center">
+                            <Button Content="&#xE778;"
+                                    Width="56" Height="56"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="18"
+                                    Foreground="White"
+                                    Style="{StaticResource DiscordDisconnectButtonStyle}"
+                                    Click="DeclineIncomingCall_Click"
+                                    ToolTip="Отклонить"/>
+                            <TextBlock Text="Отклонить"
+                                       Foreground="#949BA4"
+                                       FontSize="12"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,10,0,0"/>
+                        </StackPanel>
+                        <StackPanel Margin="20,0" HorizontalAlignment="Center">
+                            <Button Content="&#xE717;"
+                                    Width="56" Height="56"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="18"
+                                    Foreground="White"
+                                    Background="#23A559"
+                                    Style="{StaticResource DiscordVoiceControlButtonStyle}"
+                                    Click="AcceptIncomingCall_Click"
+                                    ToolTip="Принять"/>
+                            <TextBlock Text="Принять"
+                                       Foreground="#949BA4"
+                                       FontSize="12"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,10,0,0"/>
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
+            </Grid>
+
+            <Popup x:Name="PeerVolumePopup"
+               AllowsTransparency="True"
+               PopupAnimation="Fade"
+               StaysOpen="False">
+            <Border Background="#232428"
+                    CornerRadius="10"
+                    BorderBrush="#3F4147"
+                    BorderThickness="1"
+                    Padding="14,12"
+                    MinWidth="236">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.55" Color="#000000"/>
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock x:Name="PeerVolumeHeader"
+                               Text="Громкость: 100%"
+                               Foreground="#DBDEE1"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <Slider x:Name="PeerVolumeSlider"
+                            Style="{StaticResource ModernSliderStyle}"
+                            Width="208"
+                            Margin="0,12,0,10"
+                            ValueChanged="PeerVolumeSlider_ValueChanged"/>
+                    <Button x:Name="PeerVolumeMuteButton"
+                            Content="Заглушить собеседника"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="#F2F3F5"
+                            FontSize="13"
+                            HorizontalContentAlignment="Left"
+                            Padding="2,6"
+                            Cursor="Hand"
+                            Click="PeerVolumeMuteButton_Click"/>
+                </StackPanel>
             </Border>
+            </Popup>
         </Grid>
-    </Grid>
+    </Border>
 </Window>

@@ -76,6 +76,21 @@ namespace ChatServer
             return _sessions.SendVoiceKeys(fromUserId, sessionKey, iv);
         }
 
+        public Task RegisterDirectEndpoint(int userId, string host, int port)
+        {
+            return _sessions.RegisterDirectEndpoint(Context.ConnectionId, userId, host, port);
+        }
+
+        public Task NotifyDirectLinkReady(int userId)
+        {
+            return _sessions.NotifyDirectLinkReady(Context.ConnectionId, userId);
+        }
+
+        public Task RefreshDirectLink(int userId)
+        {
+            return _sessions.RefreshDirectLink(Context.ConnectionId, userId);
+        }
+
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             await _sessions.HandleConnectionLost(Context.ConnectionId);

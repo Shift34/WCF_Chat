@@ -94,6 +94,10 @@ namespace ChatServer
 
                 _usersFound.Remove(identificator);
                 user.InCall = false;
+                user.DirectHost = string.Empty;
+                user.DirectPort = 0;
+                user.DirectLinkReady = false;
+                user.DirectP2PActive = false;
                 _usersNoSearch[user.ID] = user;
             }
 
@@ -158,7 +162,10 @@ namespace ChatServer
             {
                 if (!_usersFound.TryGetValue(identificator, out var user) || user.ID1 == -1)
                     return;
-                _usersFound.TryGetValue(user.ID1, out peer);
+                if (!_usersFound.TryGetValue(user.ID1, out peer))
+                    return;
+                if (user.DirectP2PActive && peer.DirectP2PActive)
+                    return;
             }
 
             if (peer == null)
@@ -197,8 +204,91 @@ namespace ChatServer
             if (user == null || peer == null)
                 return;
 
-            await Send(user, "GetConnectionProtocol", state);
-            await Send(peer, "GetConnectionProtocol", state);
+            await Send(user, "GetConnectionProtocol", state, user.ID1);
+            await Send(peer, "GetConnectionProtocol", state, peer.ID1);
+        }
+
+        public async Task RegisterDirectEndpoint(string connectionId, int userId, string host, int port)
+        {
+            ServerUser? user;
+            ServerUser? peer;
+
+            lock (_lock)
+            {
+                if (!_usersFound.TryGetValue(userId, out user!))
+                    return;
+
+                BindConnection(user, connectionId);
+                user.DirectHost = host ?? string.Empty;
+                user.DirectPort = port;
+                user.DirectLinkReady = false;
+                user.DirectP2PActive = false;
+
+                if (user.ID1 == -1 || !_usersFound.TryGetValue(user.ID1, out peer))
+                    peer = null;
+                else
+                {
+                    peer.DirectLinkReady = false;
+                    peer.DirectP2PActive = false;
+                }
+            }
+
+            if (peer != null)
+                await TryNotifyDirectLink(user, peer);
+        }
+
+        public async Task RefreshDirectLink(string connectionId, int userId)
+        {
+            ServerUser? user;
+            ServerUser? peer;
+
+            lock (_lock)
+            {
+                if (!_usersFound.TryGetValue(userId, out user!))
+                    return;
+
+                BindConnection(user, connectionId);
+
+                if (user.ID1 == -1 || !_usersFound.TryGetValue(user.ID1, out peer))
+                    peer = null;
+            }
+
+            if (peer != null)
+                await TryNotifyDirectLink(user!, peer);
+        }
+
+        private async Task TryNotifyDirectLink(ServerUser user, ServerUser peer)
+        {
+            ServerUser lower = user.ID < peer.ID ? user : peer;
+            ServerUser higher = user.ID < peer.ID ? peer : user;
+
+            if (string.IsNullOrWhiteSpace(lower.DirectHost) || lower.DirectPort <= 0)
+                return;
+
+            await Send(higher, "EstablishDirectLink", lower.DirectHost, lower.DirectPort);
+        }
+
+        public Task NotifyDirectLinkReady(string connectionId, int userId)
+        {
+            lock (_lock)
+            {
+                if (!_usersFound.TryGetValue(userId, out var user))
+                    return Task.CompletedTask;
+
+                BindConnection(user, connectionId);
+                user.DirectLinkReady = true;
+
+                if (user.ID1 == -1 || !_usersFound.TryGetValue(user.ID1, out var peer))
+                    return Task.CompletedTask;
+
+                if (!peer.DirectLinkReady)
+                    return Task.CompletedTask;
+
+                user.DirectP2PActive = true;
+                peer.DirectP2PActive = true;
+            }
+
+            return Task.CompletedTask;
         }
 
         public async Task SendCallRequest(int userId, string callerIP, int callerPort)
@@ -207,7 +297,7 @@ namespace ChatServer
             lock (_lock)
             {
                 var caller = FindUser(userId);
-                if (caller == null || caller.ID1 == -1)
+                if (caller == null || caller.ID1 == -1 || caller.DirectP2PActive)
                     return;
                 callee = FindUser(caller.ID1);
             }
@@ -222,7 +312,7 @@ namespace ChatServer
             lock (_lock)
             {
                 var answerer = FindUser(userId);
-                if (answerer == null || answerer.ID1 == -1)
+                if (answerer == null || answerer.ID1 == -1 || answerer.DirectP2PActive)
                     return;
 
                 caller = FindUser(answerer.ID1);
@@ -243,7 +333,7 @@ namespace ChatServer
             lock (_lock)
             {
                 var user = FindUser(userId);
-                if (user == null || user.ID1 == -1)
+                if (user == null || user.ID1 == -1 || user.DirectP2PActive)
                     return;
 
                 peer = FindUser(user.ID1);
@@ -262,7 +352,7 @@ namespace ChatServer
             lock (_lock)
             {
                 var user = FindUser(fromUserId);
-                if (user == null || user.ID1 == -1)
+                if (user == null || user.ID1 == -1 || user.DirectP2PActive)
                     return;
                 peer = FindUser(user.ID1);
             }
@@ -277,7 +367,7 @@ namespace ChatServer
             lock (_lock)
             {
                 var user = FindUser(fromUserId);
-                if (user == null || user.ID1 == -1)
+                if (user == null || user.ID1 == -1 || user.DirectP2PActive)
                     return;
                 peer = FindUser(user.ID1);
             }
