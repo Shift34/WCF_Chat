@@ -10,24 +10,23 @@ namespace ChatClient.ProtocolSignal
 
         public HMAC(byte[] key, int hashSize = 512)
         {
+            if (key == null)
+                throw new ArgumentNullException(nameof(key));
             if (hashSize != 256 && hashSize != 512)
                 throw new ArgumentException("Hash size must be 256 or 512");
 
             _streebog = new Streebog(hashSize);
 
-            // Подготовка ключа (RFC 2104)
-            if (key.Length > _blockSize)
+            // RFC 2104: ключ длиннее блока хешируется, короче — дополняется нулями.
+            byte[] prepared = key.Length > _blockSize ? _streebog.GetHash(key) : key;
+            if (prepared.Length == _blockSize)
             {
-                _key = _streebog.GetHash(key);
-            }
-            else if (key.Length < _blockSize)
-            {
-                _key = new byte[_blockSize];
-                Array.Copy(key, _key, key.Length);
+                _key = (byte[])prepared.Clone();
             }
             else
             {
-                _key = (byte[])key.Clone();
+                _key = new byte[_blockSize];
+                Array.Copy(prepared, _key, prepared.Length);
             }
         }
 

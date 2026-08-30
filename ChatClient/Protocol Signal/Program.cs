@@ -14,11 +14,15 @@ namespace ChatClient.ProtocolSignal
 
 
 
-        // Вычисление HMAC
         public static byte[] ComputeHmac(byte[] key, byte[] data)
         {
-            using (var hmac = new HMACSHA256(key))
-                return hmac.ComputeHash(data);
+            if (key == null)
+                throw new ArgumentNullException(nameof(key));
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+
+            var hmac = new HMAC(key, 256);
+            return hmac.ComputeHash(data);
         }
 
         public static void DeriveKeys(byte[] sharedSecret, out byte[] aesKey, out byte[] hmacKey)
