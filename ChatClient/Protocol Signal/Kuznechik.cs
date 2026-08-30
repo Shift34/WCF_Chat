@@ -7,6 +7,7 @@ namespace ChatClient.ProtocolSignal
     {
         private Kuznechik _kuznechik;
         private byte[] _counter;
+        private byte[] _iv;
         private byte[] _masterKey;
         private readonly object _lockObj = new object();
         private byte[] _gammaBuffer;
@@ -22,7 +23,9 @@ namespace ChatClient.ProtocolSignal
             _masterKey = new byte[32];
             Array.Copy(key, _masterKey, 32);
             _kuznechik = new Kuznechik();
+            _kuznechik.GenerateRoundKeys(_masterKey);
             _counter = new byte[16];
+            _iv = new byte[16];
             _gammaBuffer = new byte[16];
             _gammaBufferOffset = 16;
         }
@@ -36,8 +39,10 @@ namespace ChatClient.ProtocolSignal
 
             lock (_lockObj)
             {
+                Array.Clear(_iv, 0, _iv.Length);
+                Array.Copy(iv, _iv, iv.Length);
                 Array.Clear(_counter, 0, _counter.Length);
-                Array.Copy(iv, _counter, iv.Length);
+                Array.Copy(_iv, _counter, _iv.Length);
                 _gammaBufferOffset = 16;
             }
         }
@@ -56,9 +61,41 @@ namespace ChatClient.ProtocolSignal
             lock (_lockObj)
             {
                 Array.Copy(newKey, _masterKey, 32);
+                _kuznechik.GenerateRoundKeys(_masterKey);
+                Array.Clear(_iv, 0, _iv.Length);
+                Array.Copy(newIV, _iv, newIV.Length);
                 Array.Clear(_counter, 0, _counter.Length);
-                Array.Copy(newIV, _counter, newIV.Length);
+                Array.Copy(_iv, _counter, _iv.Length);
                 _gammaBufferOffset = 16;
+            }
+        }
+
+        public void XorPacket(byte[] data, int offset, int length, long packetNumber)
+        {
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+
+            lock (_lockObj)
+            {
+                Array.Copy(_iv, _counter, 16);
+                byte[] number = BitConverter.GetBytes(packetNumber);
+                for (int i = 0; i < 8; i++)
+                    _counter[i] ^= number[i];
+                _gammaBufferOffset = 16;
+
+                int processed = 0;
+                while (processed < length)
+                {
+                    if (_gammaBufferOffset >= _gammaBuffer.Length)
+                        GenerateGammaBlock();
+
+                    int blockSize = Math.Min(length - processed, _gammaBuffer.Length - _gammaBufferOffset);
+                    for (int i = 0; i < blockSize; i++)
+                        data[offset + processed + i] ^= _gammaBuffer[_gammaBufferOffset + i];
+
+                    processed += blockSize;
+                    _gammaBufferOffset += blockSize;
+                }
             }
         }
 
@@ -105,7 +142,7 @@ namespace ChatClient.ProtocolSignal
 
         private void GenerateGammaBlock()
         {
-            byte[] encryptedCounter = _kuznechik.EncryptBlock(_counter, _masterKey);
+            byte[] encryptedCounter = _kuznechik.EncryptLoaded(_counter);
             Array.Copy(encryptedCounter, 0, _gammaBuffer, 0, 16);
 
             // В режиме CTR по ГОСТ Р 34.13-2015 увеличивается младшая
@@ -128,6 +165,8 @@ namespace ChatClient.ProtocolSignal
                 Array.Clear(_masterKey, 0, _masterKey.Length);
             if (_gammaBuffer != null)
                 Array.Clear(_gammaBuffer, 0, _gammaBuffer.Length);
+            if (_iv != null)
+                Array.Clear(_iv, 0, _iv.Length);
         }
     }
 
@@ -315,6 +354,18 @@ namespace ChatClient.ProtocolSignal
             }
 
             return result;
+        }
+
+        internal void GenerateRoundKeys(byte[] masterKey)
+        {
+            ValidateKey(masterKey);
+            KuzKeyGen(masterKey);
+        }
+
+        internal byte[] EncryptLoaded(byte[] block)
+        {
+            ValidateBlock(block);
+            return EncryptBlockWithRoundKeys(block);
         }
 
         public byte[] EncryptBlock(byte[] block, byte[] masterKey)

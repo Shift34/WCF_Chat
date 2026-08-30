@@ -72,7 +72,7 @@ namespace ChatClient
             _signature = new GostSignature();
             _signPublicKey = _signature.GetPublicKey();
 
-            _hubUrl = ConfigurationManager.AppSettings["ChatHubUrl"] ?? "http://localhost:5000/chat";
+            _hubUrl = ConfigurationManager.AppSettings["ChatHubUrl"] ?? "http://81.200.152.57:8080/chat";
             client = new ChatHubClient(_hubUrl);
             client.GetConnectionAndPublicKey += GetConnectionAndPublicKey;
             client.GetConnectionProtocol += GetConnectionProtocol;
@@ -650,6 +650,35 @@ namespace ChatClient
             _voiceIV = null;
         }
 
+        private byte[] ProtectVoiceKeys(byte[] sessionKey, byte[] iv)
+        {
+            if (kuznechik == null || aesKey == null)
+                throw new InvalidOperationException("Сеансовый ключ шифрования ещё не выведен.");
+
+            byte[] payload = new byte[48];
+            Array.Copy(sessionKey, 0, payload, 0, 32);
+            Array.Copy(iv, 0, payload, 32, 16);
+            return kuznechik.KuzEncript(payload, aesKey);
+        }
+
+        private bool TryUnprotectVoiceKeys(byte[] blob, out byte[] sessionKey, out byte[] iv)
+        {
+            sessionKey = null;
+            iv = null;
+            if (kuznechik == null || aesKey == null || blob == null || blob.Length < 56)
+                return false;
+
+            byte[] plain = kuznechik.KuzDecript(blob, aesKey);
+            if (plain == null || plain.Length != 48)
+                return false;
+
+            sessionKey = new byte[32];
+            iv = new byte[16];
+            Array.Copy(plain, 0, sessionKey, 0, 32);
+            Array.Copy(plain, 32, iv, 0, 16);
+            return true;
+        }
+
         private int GetPortFromFile()
         {
             try
@@ -692,13 +721,19 @@ namespace ChatClient
             }
 
             if (CanTalkToServer)
-                await client.SendVoiceKeysAsync(ID, _voiceSessionKey, _voiceIV);
+                await client.SendVoiceKeysAsync(ID, ProtectVoiceKeys(_voiceSessionKey, _voiceIV), Array.Empty<byte>());
         }
 
         public void ReceiveVoiceKeys(int fromUserId, byte[] sessionKey, byte[] iv)
         {
-            _voiceSessionKey = sessionKey;
-            _voiceIV = iv;
+            if (!TryUnprotectVoiceKeys(sessionKey, out byte[] key, out byte[] voiceIv))
+            {
+                _viewModel.AddSystemMessage("Не удалось принять ключи голоса");
+                return;
+            }
+
+            _voiceSessionKey = key;
+            _voiceIV = voiceIv;
             ApplyVoiceKeysIfReady();
             if (_isInCall)
                 _voiceCall?.BeginLocalAudio();

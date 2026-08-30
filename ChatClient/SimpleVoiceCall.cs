@@ -1,9 +1,9 @@
-﻿using NAudio.Wave;
+﻿using ChatClient.ProtocolSignal;
+using NAudio.Wave;
 using System;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,8 +13,8 @@ namespace ChatClient
     {
         private const int SampleRate = 16000;
         private const int BytesPerMillisecond = SampleRate * 2 / 1000;
-        private const int MaxBufferMs = 80;
-        private const int PrerollMs = 30;
+        private const int MaxBufferMs = 120;
+        private const int PrerollMs = 40;
 
         private UdpClient _udpClient;
         private WaveInEvent _microphone;
@@ -34,7 +34,10 @@ namespace ChatClient
         private int _volumeTick;
         private int _lastUdpReceiveTicks;
         private bool _udpPathAnnounced;
+        private bool _sameMachine;
         private readonly object _cryptoLock = new object();
+        private readonly VoiceCleanup _cleanup = new VoiceCleanup();
+        private readonly byte[] _captureCopy = new byte[SampleRate];
 
         public event Action<string> OnStatusChanged;
         public event Action<float> OnVolumeChanged;
@@ -49,8 +52,8 @@ namespace ChatClient
             _microphone = new WaveInEvent
             {
                 WaveFormat = format,
-                BufferMilliseconds = 10,
-                NumberOfBuffers = 3
+                BufferMilliseconds = 20,
+                NumberOfBuffers = 4
             };
             _microphone.DataAvailable += OnMicrophoneData;
 
@@ -63,8 +66,8 @@ namespace ChatClient
 
             var waveOut = new WaveOutEvent
             {
-                DesiredLatency = 40,
-                NumberOfBuffers = 2
+                DesiredLatency = 60,
+                NumberOfBuffers = 3
             };
             waveOut.Init(_waveProvider);
             _speaker = waveOut;
@@ -118,7 +121,8 @@ namespace ChatClient
                 return;
 
             IPAddress address = IPAddress.Parse(ip);
-            if (IsThisMachine(address))
+            _sameMachine = IsThisMachine(address);
+            if (_sameMachine)
                 address = IPAddress.Loopback;
 
             _remoteEndPoint = new IPEndPoint(address, port);
@@ -134,6 +138,7 @@ namespace ChatClient
             _waveProvider.ClearBuffer();
             _playbackStarted = false;
             _lastPlayedPacket = -1;
+            _cleanup.Reset();
             if (_useMicrophone)
                 _microphone.StartRecording();
         }
@@ -153,6 +158,8 @@ namespace ChatClient
 
         public void ReceiveVoice(byte[] data)
         {
+            if (_udpPathAnnounced)
+                return;
             if (unchecked(Environment.TickCount - _lastUdpReceiveTicks) < 400)
                 return;
 
@@ -178,6 +185,7 @@ namespace ChatClient
         {
             _isActive = false;
             _playbackStarted = false;
+            _udpPathAnnounced = false;
             try { _microphone?.StopRecording(); } catch { }
             try { _speaker?.Stop(); } catch { }
             try { _waveProvider?.ClearBuffer(); } catch { }
@@ -217,25 +225,35 @@ namespace ChatClient
 
         private void OnMicrophoneData(object sender, WaveInEventArgs e)
         {
-            if (!_isActive || e.BytesRecorded <= 0)
+            if (!_isActive || e.BytesRecorded <= 0 || (e.BytesRecorded & 1) != 0)
                 return;
 
             try
             {
+                if (_encryptionEnabled && _sendCrypto == null)
+                    return;
+
+                if (e.BytesRecorded > _captureCopy.Length)
+                    return;
+
+                Array.Copy(e.Buffer, 0, _captureCopy, 0, e.BytesRecorded);
+                _cleanup.ProcessCapture(_captureCopy, e.BytesRecorded, _sameMachine);
+
                 if ((_volumeTick++ & 3) == 0)
-                    ReportVolume(e.Buffer, e.BytesRecorded);
+                    ReportVolume(_captureCopy, e.BytesRecorded);
 
                 long packetNumber = Interlocked.Increment(ref _packetCounter) - 1;
                 byte[] packet = new byte[e.BytesRecorded + 10];
                 packet[0] = 0x01;
-                packet[1] = (byte)(_encryptionEnabled ? 0x01 : 0x00);
+                bool encrypt = _encryptionEnabled && _sendCrypto != null;
+                packet[1] = (byte)(encrypt ? 0x01 : 0x00);
                 Array.Copy(BitConverter.GetBytes(packetNumber), 0, packet, 2, 8);
-                Array.Copy(e.Buffer, 0, packet, 10, e.BytesRecorded);
+                Array.Copy(_captureCopy, 0, packet, 10, e.BytesRecorded);
 
-                if (_encryptionEnabled)
+                if (encrypt)
                 {
                     lock (_cryptoLock)
-                        _sendCrypto?.XorPacket(packet, 10, e.BytesRecorded, packetNumber);
+                        _sendCrypto.XorPacket(packet, 10, e.BytesRecorded, packetNumber);
                 }
 
                 if (_udpClient != null && _remoteEndPoint != null)
@@ -314,8 +332,6 @@ namespace ChatClient
                 if (packetNumber <= _lastPlayedPacket)
                     return;
 
-                _lastPlayedPacket = packetNumber;
-
                 int payloadLength = packet.Length - 10;
                 if (payloadLength <= 0 || (payloadLength & 1) != 0)
                     return;
@@ -336,6 +352,13 @@ namespace ChatClient
                     }
                 }
 
+                if (_lastPlayedPacket >= 0 && packetNumber > _lastPlayedPacket + 1)
+                    FillGap(packetNumber - _lastPlayedPacket - 1, payloadLength);
+
+                _lastPlayedPacket = packetNumber;
+
+                _cleanup.ProcessPlayback(audio, audio.Length, _sameMachine);
+
                 int buffered = _waveProvider.BufferedBytes;
                 if (buffered > MaxBufferMs * BytesPerMillisecond)
                     return;
@@ -347,6 +370,25 @@ namespace ChatClient
             {
                 Console.WriteLine("Ошибка воспроизведения голоса: " + ex.Message);
             }
+        }
+
+        private void FillGap(long missingPackets, int frameBytes)
+        {
+            int packets = (int)Math.Min(missingPackets, 4);
+            if (packets <= 0 || frameBytes <= 0)
+                return;
+
+            int bytes = packets * frameBytes;
+            int room = MaxBufferMs * BytesPerMillisecond - _waveProvider.BufferedBytes;
+            if (room <= 0)
+                return;
+
+            bytes = Math.Min(bytes, room);
+            bytes &= ~1;
+            if (bytes <= 0)
+                return;
+
+            _waveProvider.AddSamples(new byte[bytes], 0, bytes);
         }
 
         private void StartPlaybackIfReady()
@@ -393,13 +435,146 @@ namespace ChatClient
         }
     }
 
+    internal sealed class VoiceCleanup
+    {
+        private const float DcR = 0.996f;
+        private const float EnvAttack = 0.40f;
+        private const float EnvRelease = 0.12f;
+        private const float GateOpen = 0.032f;
+        private const float GateClose = 0.016f;
+        private const float GainAttack = 0.22f;
+        private const float GainRelease = 0.05f;
+        private const float PlayDecay = 0.86f;
+
+        private float _capX;
+        private float _capY;
+        private float _playX;
+        private float _playY;
+        private float _env;
+        private float _gain;
+        private float _playbackEnv;
+        private bool _open;
+        private readonly object _lock = new object();
+
+        public void Reset()
+        {
+            lock (_lock)
+            {
+                _capX = 0;
+                _capY = 0;
+                _playX = 0;
+                _playY = 0;
+                _env = 0;
+                _gain = 0;
+                _playbackEnv = 0;
+                _open = false;
+            }
+        }
+
+        public void ProcessCapture(byte[] buffer, int length, bool sameMachine)
+        {
+            lock (_lock)
+            {
+            float extra = _playbackEnv * (sameMachine ? 1.15f : 0.55f);
+            if (sameMachine)
+                extra += 0.018f;
+
+            float openAt = GateOpen + extra;
+            float closeAt = Math.Max(GateClose, openAt * 0.5f);
+            float peak = 0f;
+
+            for (int i = 0; i + 1 < length; i += 2)
+            {
+                float x = BitConverter.ToInt16(buffer, i) / 32768f;
+                float y = DcR * (_capY + x - _capX);
+                _capX = x;
+                _capY = y;
+                float a = Math.Abs(y);
+                if (a > peak)
+                    peak = a;
+
+                float target = _open ? 1f : 0f;
+                float speed = target > _gain ? GainAttack : GainRelease;
+                _gain += (target - _gain) * speed;
+                y *= _gain;
+                y = SoftLimit(y);
+                WriteSample(buffer, i, y);
+            }
+
+            if (peak > _env)
+                _env += (peak - _env) * EnvAttack;
+            else
+                _env += (peak - _env) * EnvRelease;
+
+            if (_open)
+            {
+                if (_env < closeAt)
+                    _open = false;
+            }
+            else if (_env > openAt)
+            {
+                _open = true;
+            }
+
+            _playbackEnv *= PlayDecay;
+            }
+        }
+
+        public void ProcessPlayback(byte[] buffer, int length, bool sameMachine)
+        {
+            lock (_lock)
+            {
+            float peak = 0f;
+            float duck = sameMachine ? 0.82f : 1f;
+
+            for (int i = 0; i + 1 < length; i += 2)
+            {
+                float x = BitConverter.ToInt16(buffer, i) / 32768f;
+                float y = DcR * (_playY + x - _playX);
+                _playX = x;
+                _playY = y;
+                y *= duck;
+                y = SoftLimit(y);
+                float a = Math.Abs(y);
+                if (a > peak)
+                    peak = a;
+                WriteSample(buffer, i, y);
+            }
+
+            if (peak > _playbackEnv)
+                _playbackEnv = peak;
+            else
+                _playbackEnv = Math.Max(peak, _playbackEnv * PlayDecay);
+            }
+        }
+
+        private static float SoftLimit(float x)
+        {
+            const float t = 0.88f;
+            float a = Math.Abs(x);
+            if (a <= t)
+                return x;
+
+            float sign = x < 0 ? -1f : 1f;
+            return sign * (t + (1f - t) * (a - t) / (a - t + 0.35f));
+        }
+
+        private static void WriteSample(byte[] buffer, int offset, float sample)
+        {
+            if (sample > 1f)
+                sample = 1f;
+            else if (sample < -1f)
+                sample = -1f;
+
+            short value = (short)(sample * 32767f);
+            buffer[offset] = (byte)value;
+            buffer[offset + 1] = (byte)(value >> 8);
+        }
+    }
+
     internal sealed class VoicePacketCrypto : IDisposable
     {
-        private readonly byte[] _iv;
-        private readonly Aes _aes;
-        private readonly ICryptoTransform _encryptor;
-        private readonly byte[] _counter = new byte[16];
-        private readonly byte[] _gamma = new byte[16];
+        private readonly KuznechikStreaming _stream;
 
         public VoicePacketCrypto(byte[] key, byte[] iv)
         {
@@ -408,43 +583,18 @@ namespace ChatClient
             if (iv == null || iv.Length != 16)
                 throw new ArgumentException("IV должен быть 16 байт.", nameof(iv));
 
-            _iv = (byte[])iv.Clone();
-            _aes = Aes.Create();
-            _aes.KeySize = 256;
-            _aes.Mode = CipherMode.ECB;
-            _aes.Padding = PaddingMode.None;
-            _aes.Key = key;
-            _encryptor = _aes.CreateEncryptor();
+            _stream = new KuznechikStreaming(key);
+            _stream.InitSession(iv);
         }
 
         public void XorPacket(byte[] data, int offset, int length, long packetNumber)
         {
-            Array.Copy(_iv, _counter, 16);
-            byte[] number = BitConverter.GetBytes(packetNumber);
-            for (int i = 0; i < 8; i++)
-                _counter[i] ^= number[i];
-
-            int processed = 0;
-            while (processed < length)
-            {
-                _encryptor.TransformBlock(_counter, 0, 16, _gamma, 0);
-                int block = Math.Min(16, length - processed);
-                for (int i = 0; i < block; i++)
-                    data[offset + processed + i] ^= _gamma[i];
-
-                processed += block;
-                for (int j = 15; j >= 8; j--)
-                {
-                    if (++_counter[j] != 0)
-                        break;
-                }
-            }
+            _stream.XorPacket(data, offset, length, packetNumber);
         }
 
         public void Dispose()
         {
-            _encryptor?.Dispose();
-            _aes?.Dispose();
+            _stream?.Dispose();
         }
     }
 }
