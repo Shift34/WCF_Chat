@@ -30,9 +30,9 @@ namespace ChatClient
             bool isOwnMessage = (bool)value;
 
             if (isOwnMessage)
-                return new SolidColorBrush(Color.FromRgb(0, 120, 212));
+                return new SolidColorBrush(Color.FromRgb(92, 78, 209));
 
-            return new SolidColorBrush(Color.FromRgb(64, 68, 75));
+            return new SolidColorBrush(Color.FromRgb(38, 44, 58));
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

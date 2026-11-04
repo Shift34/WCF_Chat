@@ -8,5 +8,9 @@ namespace ChatServer
         public byte[]? SignPublicKey { get; set; }
         public string ConnectionId { get; set; } = string.Empty;
         public bool InCall { get; set; }
+        public string DirectHost { get; set; } = string.Empty;
+        public int DirectPort { get; set; }
+        public bool DirectLinkReady { get; set; }
+        public bool DirectP2PActive { get; set; }
     }
 }

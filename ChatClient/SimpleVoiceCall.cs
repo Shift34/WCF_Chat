@@ -28,6 +28,7 @@ namespace ChatClient
         private bool _isActive;
         private bool _playbackStarted;
         private bool _useMicrophone = true;
+        private bool _captureMuted;
         private bool _encryptionEnabled = true;
         private long _packetCounter;
         private long _lastPlayedPacket = -1;
@@ -168,10 +169,9 @@ namespace ChatClient
 
         public void SetMute(bool mute)
         {
-            if (mute)
-                _microphone?.StopRecording();
-            else if (_useMicrophone)
-                _microphone?.StartRecording();
+            _captureMuted = mute;
+            if (!mute)
+                _cleanup.ResetCaptureGate();
         }
 
         public void SetSpeakerVolume(float volume)
@@ -227,6 +227,13 @@ namespace ChatClient
         {
             if (!_isActive || e.BytesRecorded <= 0 || (e.BytesRecorded & 1) != 0)
                 return;
+
+            if (_captureMuted)
+            {
+                if ((_volumeTick++ & 3) == 0)
+                    OnVolumeChanged?.Invoke(0);
+                return;
+            }
 
             try
             {
@@ -468,6 +475,16 @@ namespace ChatClient
                 _gain = 0;
                 _playbackEnv = 0;
                 _open = false;
+            }
+        }
+
+        public void ResetCaptureGate()
+        {
+            lock (_lock)
+            {
+                _env = 0;
+                _gain = 1f;
+                _open = true;
             }
         }
 

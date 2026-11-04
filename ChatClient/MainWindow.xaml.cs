@@ -11,11 +11,13 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 namespace ChatClient
@@ -52,6 +54,30 @@ namespace ChatClient
         private readonly CallTonePlayer _callTones = new CallTonePlayer();
         private string _incomingCallerIP;
         private int _incomingCallerPort;
+        private DirectPeerLink _directPeer;
+        private CancellationTokenSource _directLinkCts;
+        private int _peerId = -1;
+        private bool _directP2PActive;
+        private int _directPort;
+        private const string DirectPortFile = "chat_direct_port.txt";
+        private const int DirectPortMin = 7200;
+        private const int DirectPortMax = 8200;
+        private SimpleVideoCall _videoCall;
+        private byte[] _videoSessionKey;
+        private byte[] _videoIV;
+        private byte[] _videoMacKey;
+        private int _videoPort;
+        private bool _isVideoActive;
+        private string _pendingVideoHost;
+        private int _pendingVideoPort;
+        private const string VideoPortFile = "video_port.txt";
+        private const int VideoPortMin = 8300;
+        private const int VideoPortMax = 9300;
+        private string _pendingDirectHost;
+        private int _pendingDirectPort;
+        private int _directReconnectVersion;
+        private bool _directConnectInProgress;
+        private int _activeDirectListenPort;
 
         private enum State
         {
@@ -72,7 +98,7 @@ namespace ChatClient
             _signature = new GostSignature();
             _signPublicKey = _signature.GetPublicKey();
 
-            _hubUrl = ConfigurationManager.AppSettings["ChatHubUrl"] ?? "http://81.200.152.57:8080/chat";
+            _hubUrl = ConfigurationManager.AppSettings["ChatHubUrl"] ?? "http://localhost:8080/chat";
             client = new ChatHubClient(_hubUrl);
             client.GetConnectionAndPublicKey += GetConnectionAndPublicKey;
             client.GetConnectionProtocol += GetConnectionProtocol;
@@ -86,8 +112,11 @@ namespace ChatClient
             client.CallEnded += CallEnded;
             client.ReceiveVoice += ReceiveVoice;
             client.ReceiveVoiceKeys += ReceiveVoiceKeys;
+            client.EstablishDirectLink += OnEstablishDirectLink;
 
             _voicePort = GetPortFromFile();
+            _directPort = GetDirectPortFromFile();
+            _videoPort = GetVideoPortFromFile();
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -121,6 +150,7 @@ namespace ChatClient
             e.Cancel = true;
             _isClosing = true;
             await DisconnectUserAsync();
+            EndVideoInternal(showMessage: false);
             _callTones.Dispose();
             client?.Dispose();
             Close();
@@ -163,6 +193,9 @@ namespace ChatClient
                 }
             }
 
+            EndVideoInternal(showMessage: false);
+            TearDownDirectLink(notifyPeer: true);
+
             if (!resetUi)
                 return;
 
@@ -170,6 +203,8 @@ namespace ChatClient
             _viewModel.ResetToIdle();
             _messageDict.Clear();
             state = State.NoSearch;
+            _peerId = -1;
+            _directP2PActive = false;
         }
 
         public void GetConnectionAndPublicKey(byte[] publickey, byte[] signPublicKey)
@@ -199,7 +234,7 @@ namespace ChatClient
             await client.SendHashProtocolAsync(nonce, hmac, ID);
         }
 
-        public void GetConnectionProtocol(bool work)
+        public void GetConnectionProtocol(bool work, int peerId)
         {
             if (!work)
             {
@@ -209,12 +244,14 @@ namespace ChatClient
                 return;
             }
 
+            _peerId = peerId;
             _viewModel.ShowConnected();
             _myIP = GetLocalIPAddress();
             state = State.Found;
 
             SignalProtocolExample.DeriveKeys(aliceSharedSecret, out aesKey, out hmacKey);
             kuznechik = new Kuznechik();
+            _ = BeginDirectPeerSessionAsync();
         }
 
         public async void CompareHMAC(byte[] key, byte[] hmac)
@@ -300,10 +337,30 @@ namespace ChatClient
             _ = SendCurrentMessageAsync();
         }
 
+        private void TextBoxMessage_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            var textBox = (TextBox)sender;
+            textBox.UpdateLayout();
+            bool useTop = textBox.Text.Contains('\n')
+                || textBox.Text.Contains('\r')
+                || textBox.ActualHeight > textBox.MinHeight + 2;
+            textBox.VerticalContentAlignment = useTop ? VerticalAlignment.Top : VerticalAlignment.Center;
+        }
+
+        private async void SendButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (client == null || string.IsNullOrWhiteSpace(TextBoxMessage.Text) || kuznechik == null)
+                return;
+
+            await SendCurrentMessageAsync();
+        }
+
         private async Task SendCurrentMessageAsync()
         {
             string text = TextBoxMessage.Text.Trim();
-            if (string.IsNullOrEmpty(text) || !CanTalkToServer)
+            if (string.IsNullOrEmpty(text) || state != State.Found || kuznechik == null)
+                return;
+            if (_directPeer?.IsConnected != true && !CanTalkToServer)
                 return;
 
             var message = _viewModel.AddChatMessage(text, true, MessageStatus.Sent);
@@ -317,7 +374,7 @@ namespace ChatClient
                 byte[] signature = _signature.Sign(messageBytes);
                 byte[] encrypted = kuznechik.KuzEncript(messageBytes, aesKey);
                 byte[] hmac = SignalProtocolExample.ComputeHmac(hmacKey, encrypted);
-                await client.SendSignedMessageAsync(hmac, encrypted, signature, ID);
+                await SendSignedMessageRouteAsync(hmac, encrypted, signature);
                 message.Status = MessageStatus.Delivered;
             }
             catch (Exception ex)
@@ -421,61 +478,45 @@ namespace ChatClient
                 return;
             }
 
-            var contextMenu = new ContextMenu
-            {
-                Background = new SolidColorBrush(Color.FromRgb(47, 49, 54)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(32, 34, 37)),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(8, 4, 8, 4),
-                FontFamily = new FontFamily("Segoe UI"),
-                Foreground = new SolidColorBrush(Color.FromRgb(220, 221, 222))
-            };
+            PeerVolumeSlider.Value = _peerVolume * 100;
+            UpdatePeerVolumePopupUi();
+            PeerVolumePopup.PlacementTarget = PeerParticipantTile;
+            PeerVolumePopup.Placement = System.Windows.Controls.Primitives.PlacementMode.Mouse;
+            PeerVolumePopup.IsOpen = true;
+            e.Handled = true;
+        }
 
-            var header = new MenuItem
-            {
-                Header = _isPeerMuted ? "Собеседник заглушен" : $"Громкость: {_peerVolume * 100:F0}%",
-                IsEnabled = false,
-                Foreground = new SolidColorBrush(Color.FromRgb(185, 187, 190))
-            };
-            contextMenu.Items.Add(header);
-            contextMenu.Items.Add(new Separator());
+        private void UpdatePeerVolumePopupUi()
+        {
+            PeerVolumeHeader.Text = _isPeerMuted
+                ? "Собеседник заглушен"
+                : $"Громкость: {_peerVolume * 100:F0}%";
+            PeerVolumeMuteButton.Content = _isPeerMuted
+                ? "Включить звук собеседника"
+                : "Заглушить собеседника";
+        }
 
-            var slider = new Slider
-            {
-                Style = (Style)FindResource("ModernSliderStyle"),
-                Width = 200,
-                Value = _peerVolume * 100,
-                Margin = new Thickness(10, 8, 10, 8)
-            };
+        private void PeerVolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (!PeerVolumePopup.IsOpen)
+                return;
 
-            slider.ValueChanged += (s, args) =>
-            {
-                _peerVolume = (float)(slider.Value / 100);
-                if (!_isPeerMuted)
-                    _voiceCall?.SetSpeakerVolume(_peerVolume);
+            _peerVolume = (float)(PeerVolumeSlider.Value / 100);
+            if (!_isPeerMuted)
+                _voiceCall?.SetSpeakerVolume(_peerVolume);
 
-                header.Header = _isPeerMuted ? "Собеседник заглушен" : $"Громкость: {slider.Value:F0}%";
-            };
+            UpdatePeerVolumePopupUi();
+        }
 
-            contextMenu.Items.Add(new MenuItem { Header = slider, StaysOpenOnClick = true });
-            contextMenu.Items.Add(new Separator());
-
-            var muteItem = new MenuItem
-            {
-                Header = _isPeerMuted ? "Включить звук" : "Заглушить"
-            };
-            muteItem.Click += (s, args) =>
-            {
-                _isPeerMuted = !_isPeerMuted;
-                _voiceCall?.SetSpeakerVolume(_isPeerMuted ? 0 : _peerVolume);
-                PeerVoiceStatus.Text = _isPeerMuted ? "Заглушен" : "";
-                PeerVoiceStatus.Foreground = new SolidColorBrush(_isPeerMuted
-                    ? Color.FromRgb(218, 55, 60)
-                    : Color.FromRgb(35, 165, 89));
-            };
-            contextMenu.Items.Add(muteItem);
-
-            contextMenu.IsOpen = true;
+        private void PeerVolumeMuteButton_Click(object sender, RoutedEventArgs e)
+        {
+            _isPeerMuted = !_isPeerMuted;
+            _voiceCall?.SetSpeakerVolume(_isPeerMuted ? 0 : _peerVolume);
+            PeerVoiceStatus.Text = _isPeerMuted ? "Заглушен" : "В голосовом чате";
+            PeerVoiceStatus.Foreground = new SolidColorBrush(_isPeerMuted
+                ? Color.FromRgb(237, 66, 69)
+                : Color.FromRgb(148, 155, 164));
+            UpdatePeerVolumePopupUi();
         }
 
         private async void CallButton_Click(object sender, RoutedEventArgs e)
@@ -485,13 +526,14 @@ namespace ChatClient
                 await GenerateVoiceKeysAsync();
                 _myIP = GetLocalIPAddress();
                 _viewModel.ShowActiveCall();
+                ApplyCameraButtonVisuals();
 
                 _voiceCall = CreateVoiceCall(microphoneEnabled: true);
                 ApplyVoiceKeysIfReady();
                 _voicePort = _voiceCall.BindLocalPort(_voicePort);
                 _myIP = GetLocalIPAddress();
 
-                await client.SendCallRequestAsync(ID, _myIP, _voicePort);
+                await SendCallRequestRouteAsync(_myIP, _voicePort);
                 _isInCall = true;
                 _callTones.PlayOutgoing();
                 _viewModel.AddSystemMessage("Звонок...");
@@ -510,12 +552,89 @@ namespace ChatClient
 
             _isMuted = !_isMuted;
             _voiceCall?.SetMute(_isMuted);
-            MuteButton.Content = _isMuted ? "🔇" : "🎤";
-            MuteButton.Background = new SolidColorBrush(_isMuted
-                ? Color.FromRgb(218, 55, 60)
-                : Color.FromRgb(79, 84, 92));
+            ApplyMuteButtonVisuals();
             if (_isMuted)
+            {
                 MyGlowBorder.Opacity = 0;
+                SetMyVoiceStatus("Микрофон выключен", muted: true);
+            }
+            else
+            {
+                SetMyVoiceStatus(null);
+            }
+        }
+
+        private void SetMyVoiceStatus(string message, bool muted = false)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                MyStatusText.Visibility = Visibility.Collapsed;
+                MyStatusText.Text = string.Empty;
+                return;
+            }
+
+            MyStatusText.Visibility = Visibility.Visible;
+            MyStatusText.Text = message;
+            MyStatusText.Foreground = new SolidColorBrush(muted
+                ? Color.FromRgb(237, 66, 69)
+                : Color.FromRgb(148, 155, 164));
+        }
+
+        private void ApplyMuteButtonVisuals()
+        {
+            const string glyph = "\uE720";
+            var normal = new SolidColorBrush(Color.FromRgb(78, 80, 88));
+            var muted = new SolidColorBrush(Color.FromRgb(237, 66, 69));
+
+            MuteButton.Content = glyph;
+            MuteButton.Background = _isMuted ? muted : normal;
+
+            if (VideoMuteButton != null)
+            {
+                VideoMuteButton.Content = glyph;
+                VideoMuteButton.Background = _isMuted ? muted : normal;
+            }
+        }
+
+        private void ApplyCameraButtonVisuals()
+        {
+            if (CallStageCameraButton == null)
+                return;
+
+            var normal = new SolidColorBrush(Color.FromRgb(78, 80, 88));
+            var active = new SolidColorBrush(Color.FromRgb(35, 165, 89));
+
+            CallStageCameraButton.Content = "\uE714";
+            CallStageCameraButton.Background = _isVideoActive ? active : normal;
+            CallStageCameraButton.ToolTip = _isVideoActive ? "Выключить камеру" : "Включить камеру";
+        }
+
+        private async void CallStageCameraButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ToggleCameraAsync();
+        }
+
+        private async Task ToggleCameraAsync()
+        {
+            if (_isVideoActive)
+            {
+                EndVideoInternal(showMessage: true);
+                return;
+            }
+
+            if (state != State.Found || kuznechik == null)
+            {
+                _viewModel.AddSystemMessage("Сначала найдите собеседника.");
+                return;
+            }
+
+            if (_directPeer?.IsConnected != true)
+            {
+                _viewModel.AddSystemMessage("Видео доступно после установки прямого канала (P2P).");
+                return;
+            }
+
+            await StartVideoInviteAsync();
         }
 
         private async void EndCallButton_Click(object sender, RoutedEventArgs e)
@@ -525,8 +644,7 @@ namespace ChatClient
 
             try
             {
-                if (CanTalkToServer)
-                    await client.SendCallEndAsync(ID);
+                await SendCallEndRouteAsync();
             }
             catch
             {
@@ -567,6 +685,7 @@ namespace ChatClient
             _viewModel.IsIncomingCallVisible = false;
             _callTones.Stop();
             _viewModel.ShowActiveCall();
+            ApplyCameraButtonVisuals();
 
             _voiceCall = CreateVoiceCall(microphoneEnabled: true);
             ApplyVoiceKeysIfReady();
@@ -576,7 +695,7 @@ namespace ChatClient
 
             try
             {
-                await client.SendCallAnswerAsync(ID, true, _myIP, _voicePort);
+                await SendCallAnswerRouteAsync(true, _myIP, _voicePort);
                 _isInCall = true;
                 _voiceCall.BeginLocalAudio();
                 _viewModel.AddSystemMessage("Звонок принят");
@@ -594,7 +713,7 @@ namespace ChatClient
             _callTones.Stop();
             try
             {
-                await client.SendCallAnswerAsync(ID, false, "", 0);
+                await SendCallAnswerRouteAsync(false, "", 0);
             }
             catch
             {
@@ -626,20 +745,27 @@ namespace ChatClient
 
         private void EndCall()
         {
+            if (_isVideoActive)
+                EndVideoInternal(showMessage: false);
+
             _callTones.Stop();
             _voiceCall?.HangUp();
             _voiceCall?.Dispose();
             _voiceCall = null;
             _isInCall = false;
             _isMuted = false;
+            _isPeerMuted = false;
             _viewModel.IsIncomingCallVisible = false;
             _viewModel.ShowIdleCall();
 
-            MuteButton.Content = "🎤";
-            MuteButton.Background = new SolidColorBrush(Color.FromRgb(79, 84, 92));
+            ApplyMuteButtonVisuals();
+            ApplyCameraButtonVisuals();
             MyGlowBorder.Opacity = 0;
             PeerGlowBorder.Opacity = 0;
-            PeerVoiceStatus.Text = "";
+            SetMyVoiceStatus(null);
+            PeerVoiceStatus.Text = "В голосовом чате";
+            PeerVoiceStatus.Foreground = new SolidColorBrush(Color.FromRgb(148, 155, 164));
+            UpdateVideoTilePresentation();
 
             if (_voiceSessionKey != null)
                 Array.Clear(_voiceSessionKey, 0, _voiceSessionKey.Length);
@@ -677,6 +803,694 @@ namespace ChatClient
             Array.Copy(plain, 0, sessionKey, 0, 32);
             Array.Copy(plain, 32, iv, 0, 16);
             return true;
+        }
+
+        private async Task BeginDirectPeerSessionAsync()
+        {
+            TearDownDirectLink(notifyPeer: false);
+            _directP2PActive = false;
+            _directPeer = new DirectPeerLink();
+            WireDirectPeerEvents(_directPeer);
+            _directLinkCts = new CancellationTokenSource();
+
+            string ip = GetDirectLinkAdvertiseAddress();
+            bool loopbackListen = ip == "127.0.0.1";
+
+            if (ID < _peerId)
+            {
+                int listenPort = AllocateDirectListenPort();
+                _activeDirectListenPort = listenPort;
+                try
+                {
+                    _directPeer.StartListening(listenPort, loopbackListen);
+                }
+                catch (Exception ex)
+                {
+                    NotifyTransportStatus("Не удалось открыть порт прямого канала: " + ex.Message);
+                    _ = ScheduleDirectReconnectAsync();
+                    return;
+                }
+
+                try
+                {
+                    await client.RegisterDirectEndpointAsync(ID, ip, listenPort);
+                    await client.RefreshDirectLinkAsync(ID);
+                }
+                catch (Exception ex)
+                {
+                    NotifyTransportStatus("Не удалось зарегистрировать прямой канал: " + ex.Message);
+                }
+
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _directPeer.AcceptIncomingAsync(_directLinkCts.Token).ConfigureAwait(false);
+                        await client.NotifyDirectLinkReadyAsync(ID).ConfigureAwait(false);
+                        Dispatcher.BeginInvoke(new Action(OnDirectLinkReady));
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                    catch (Exception ex)
+                    {
+                        Dispatcher.BeginInvoke(new Action(() =>
+                            NotifyTransportStatus("Прямой канал: " + ex.Message)));
+                        if (state == State.Found && !_isClosing)
+                            _ = ScheduleDirectReconnectAsync();
+                    }
+                });
+            }
+            else
+            {
+                try
+                {
+                    await client.RegisterDirectEndpointAsync(ID, ip, 0);
+                    await client.RefreshDirectLinkAsync(ID);
+                }
+                catch (Exception ex)
+                {
+                    NotifyTransportStatus("Не удалось зарегистрировать прямой канал: " + ex.Message);
+                }
+
+                TryConnectDirectPeer();
+            }
+        }
+
+        private int AllocateDirectListenPort()
+        {
+            return GetDirectPortFromFile();
+        }
+
+        private void OnEstablishDirectLink(string host, int port)
+        {
+            _pendingDirectHost = host;
+            _pendingDirectPort = port;
+            TryConnectDirectPeer();
+        }
+
+        private void TryConnectDirectPeer()
+        {
+            if (_directPeer == null || _peerId < 0 || ID < _peerId)
+                return;
+            if (string.IsNullOrWhiteSpace(_pendingDirectHost) || _pendingDirectPort <= 0)
+                return;
+            if (_directP2PActive || _directConnectInProgress)
+                return;
+
+            _ = ConnectDirectClientAsync(_pendingDirectHost, _pendingDirectPort);
+        }
+
+        private async Task ConnectDirectClientAsync(string host, int port)
+        {
+            if (_directConnectInProgress || _directP2PActive)
+                return;
+
+            _directConnectInProgress = true;
+            try
+            {
+                bool connected = false;
+                for (int attempt = 0; attempt < 8 && !connected; attempt++)
+                {
+                    if (attempt > 0)
+                    {
+                        try
+                        {
+                            await client.RefreshDirectLinkAsync(ID).ConfigureAwait(false);
+                        }
+                        catch
+                        {
+                        }
+
+                        await Task.Delay(250 + attempt * 150).ConfigureAwait(false);
+                    }
+
+                    if (_directLinkCts == null || _directPeer == null || state != State.Found)
+                        return;
+
+                    int targetPort = _pendingDirectPort > 0 ? _pendingDirectPort : port;
+                    string targetHost = string.IsNullOrWhiteSpace(_pendingDirectHost) ? host : _pendingDirectHost;
+
+                    connected = await TryConnectDirectAsync("127.0.0.1", targetPort).ConfigureAwait(false);
+                    if (!connected && !string.IsNullOrWhiteSpace(targetHost)
+                        && !string.Equals(targetHost, "127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                    {
+                        connected = await TryConnectDirectAsync(targetHost, targetPort).ConfigureAwait(false);
+                    }
+                }
+
+                if (!connected)
+                    throw new InvalidOperationException("Не удалось установить прямое TCP-соединение.");
+
+                await client.NotifyDirectLinkReadyAsync(ID);
+                OnDirectLinkReady();
+            }
+            catch (Exception ex)
+            {
+                NotifyTransportStatus("Прямой канал: " + ex.Message);
+                if (state == State.Found && !_isClosing)
+                    _ = ScheduleDirectReconnectAsync();
+            }
+            finally
+            {
+                _directConnectInProgress = false;
+            }
+        }
+
+        private async Task<bool> TryConnectDirectAsync(string host, int port)
+        {
+            try
+            {
+                await _directPeer.ConnectAsync(host, port, _directLinkCts.Token).ConfigureAwait(false);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void OnDirectLinkReady()
+        {
+            _directP2PActive = true;
+            if (state == State.Found)
+            {
+                _viewModel.IsInputEnabled = true;
+                _viewModel.StatusText = "Собеседник на связи";
+            }
+
+            _viewModel.SetDirectLinkStatus(
+                "Прямой канал активен: сообщения и сигнализация звонков идут между вами, сервер их не передаёт.");
+        }
+
+        private void NotifyTransportStatus(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return;
+
+            _viewModel.SetDirectLinkStatus(message.Trim());
+        }
+
+        private void WireDirectPeerEvents(DirectPeerLink link)
+        {
+            link.SignedMessageReceived += (hmac, bytes, signature) =>
+                Dispatcher.BeginInvoke(new Action(() => MessageCallBackSigned(hmac, string.Empty, bytes, signature)));
+            link.CallRequestReceived += (callerIp, callerPort) =>
+                Dispatcher.BeginInvoke(new Action(() => IncomingCall(_peerId, callerIp, callerPort)));
+            link.CallAnswerReceived += (accept, ip, port) =>
+                Dispatcher.BeginInvoke(new Action(() => CallAnswered(_peerId, accept, ip, port)));
+            link.CallEndReceived += () =>
+                Dispatcher.BeginInvoke(new Action(() => CallEnded(_peerId)));
+            link.VoiceKeysReceived += (sessionKey, iv) =>
+                Dispatcher.BeginInvoke(new Action(() => ReceiveVoiceKeys(_peerId, sessionKey, iv)));
+            link.VideoKeysReceived += blob =>
+                Dispatcher.BeginInvoke(new Action(() => OnDirectVideoKeys(blob)));
+            link.VideoInviteReceived += (host, port) =>
+                Dispatcher.BeginInvoke(new Action(() => OnDirectVideoInvite(host, port)));
+            link.VideoAcceptReceived += (accept, host, port) =>
+                Dispatcher.BeginInvoke(new Action(() => OnDirectVideoAccept(accept, host, port)));
+            link.PeerLeftReceived += () =>
+                Dispatcher.BeginInvoke(new Action(OnDirectPeerLeft));
+            link.LinkStatusChanged += msg =>
+                Dispatcher.BeginInvoke(new Action(() => NotifyTransportStatus(msg)));
+
+            TryConnectDirectPeer();
+        }
+
+        private void OnDirectPeerLeft()
+        {
+            if (state != State.Found || _isClosing)
+                return;
+
+            _directP2PActive = false;
+            NotifyTransportStatus("Прямой канал закрыт. Переподключение…");
+            _ = ScheduleDirectReconnectAsync();
+        }
+
+        private async Task ScheduleDirectReconnectAsync()
+        {
+            int version = Interlocked.Increment(ref _directReconnectVersion);
+            await Task.Delay(1000).ConfigureAwait(false);
+            if (version != _directReconnectVersion || state != State.Found || _isClosing || _directP2PActive)
+                return;
+
+            await Dispatcher.InvokeAsync(async () =>
+            {
+                if (state == State.Found && !_directP2PActive)
+                    await BeginDirectPeerSessionAsync();
+            });
+        }
+
+        private string GetDirectLinkAdvertiseAddress()
+        {
+            if (_hubUrl.IndexOf("localhost", StringComparison.OrdinalIgnoreCase) >= 0
+                || _hubUrl.IndexOf("127.0.0.1", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "127.0.0.1";
+            }
+
+            return GetLocalIPAddress();
+        }
+
+        private void TearDownDirectLink(bool notifyPeer)
+        {
+            Interlocked.Increment(ref _directReconnectVersion);
+
+            try
+            {
+                if (notifyPeer && _directPeer?.IsConnected == true)
+                    _directPeer.SendPeerLeft();
+            }
+            catch
+            {
+            }
+
+            try { _directLinkCts?.Cancel(); } catch { }
+            _directLinkCts?.Dispose();
+            _directLinkCts = null;
+            _directPeer?.Dispose();
+            _directPeer = null;
+            _directP2PActive = false;
+
+            if (notifyPeer)
+            {
+                _pendingDirectHost = null;
+                _pendingDirectPort = 0;
+                _viewModel.ClearDirectLinkStatus();
+            }
+        }
+
+        private async Task SendSignedMessageRouteAsync(byte[] hmac, byte[] encrypted, byte[] signature)
+        {
+            if (_directPeer?.IsConnected == true)
+            {
+                _directPeer.SendSignedMessage(hmac, encrypted, signature);
+                return;
+            }
+
+            if (_directP2PActive)
+            {
+                _directP2PActive = false;
+                await ResetServerDirectRelayAsync().ConfigureAwait(false);
+            }
+
+            if (CanTalkToServer)
+                await client.SendSignedMessageAsync(hmac, encrypted, signature, ID).ConfigureAwait(false);
+        }
+
+        private async Task ResetServerDirectRelayAsync()
+        {
+            if (!CanTalkToServer || _peerId < 0)
+                return;
+
+            try
+            {
+                string ip = GetDirectLinkAdvertiseAddress();
+                int port = ID < _peerId ? _activeDirectListenPort : 0;
+                await client.RegisterDirectEndpointAsync(ID, ip, port).ConfigureAwait(false);
+                await client.RefreshDirectLinkAsync(ID).ConfigureAwait(false);
+            }
+            catch
+            {
+            }
+        }
+
+        private Task SendCallRequestRouteAsync(string callerIp, int callerPort)
+        {
+            if (_directPeer?.IsConnected == true)
+            {
+                _directPeer.SendCallRequest(callerIp, callerPort);
+                return Task.CompletedTask;
+            }
+
+            if (CanTalkToServer)
+                return client.SendCallRequestAsync(ID, callerIp, callerPort);
+
+            return Task.CompletedTask;
+        }
+
+        private Task SendCallAnswerRouteAsync(bool accept, string answererIp, int answererPort)
+        {
+            if (_directPeer?.IsConnected == true)
+            {
+                _directPeer.SendCallAnswer(accept, answererIp, answererPort);
+                return Task.CompletedTask;
+            }
+
+            if (CanTalkToServer)
+                return client.SendCallAnswerAsync(ID, accept, answererIp, answererPort);
+
+            return Task.CompletedTask;
+        }
+
+        private Task SendCallEndRouteAsync()
+        {
+            if (_directPeer?.IsConnected == true)
+            {
+                _directPeer.SendCallEnd();
+                return Task.CompletedTask;
+            }
+
+            if (CanTalkToServer)
+                return client.SendCallEndAsync(ID);
+
+            return Task.CompletedTask;
+        }
+
+        private Task SendVoiceKeysRouteAsync(byte[] sessionKey, byte[] iv)
+        {
+            if (_directPeer?.IsConnected == true)
+            {
+                _directPeer.SendVoiceKeys(sessionKey, iv);
+                return Task.CompletedTask;
+            }
+
+            if (CanTalkToServer)
+                return client.SendVoiceKeysAsync(ID, sessionKey, iv);
+
+            return Task.CompletedTask;
+        }
+
+        private async void VideoButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ToggleCameraAsync();
+        }
+
+        private void EndVideoButton_Click(object sender, RoutedEventArgs e)
+        {
+            EndVideoInternal(showMessage: true);
+        }
+
+        private async Task StartVideoInviteAsync()
+        {
+            try
+            {
+                await GenerateVideoSessionKeysAsync();
+                EnsureVideoCall();
+                _videoPort = _videoCall.BindLocalPort(_videoPort);
+                string ip = GetLocalIPAddress();
+
+                SendVideoKeysRoute(ProtectVideoSession(_videoSessionKey, _videoIV, _videoMacKey));
+                SendVideoInviteRoute(ip, _videoPort);
+                ApplyVideoSessionKeys();
+                _videoCall.Start();
+                _isVideoActive = true;
+                ShowVideoOverlay(true);
+                ApplyCameraButtonVisuals();
+                NotifyTransportStatus("Видеозвонок: приглашение отправлено (ГОСТ).");
+            }
+            catch (Exception ex)
+            {
+                _viewModel.AddSystemMessage("Видео: " + ex.Message);
+                EndVideoInternal(showMessage: false);
+            }
+        }
+
+        private void OnDirectVideoKeys(byte[] blob)
+        {
+            if (!TryUnprotectVideoSession(blob, out byte[] key, out byte[] iv, out byte[] macKey))
+            {
+                _viewModel.AddSystemMessage("Видео: не удалось принять ключи сессии.");
+                return;
+            }
+
+            _videoSessionKey = key;
+            _videoIV = iv;
+            _videoMacKey = macKey;
+            ApplyVideoSessionKeys();
+
+            if (!string.IsNullOrEmpty(_pendingVideoHost) && _pendingVideoPort > 0 && !_isVideoActive)
+                _ = AcceptVideoInviteAsync();
+        }
+
+        private void OnDirectVideoInvite(string host, int port)
+        {
+            _pendingVideoHost = host;
+            _pendingVideoPort = port;
+
+            if (_videoSessionKey == null)
+            {
+                NotifyTransportStatus("Видео: ожидание ключей ГОСТ…");
+                return;
+            }
+
+            _ = AcceptVideoInviteAsync();
+        }
+
+        private async Task AcceptVideoInviteAsync()
+        {
+            try
+            {
+                EnsureVideoCall();
+                _videoPort = _videoCall.BindLocalPort(_videoPort);
+                _videoCall.SetRemote(_pendingVideoHost, _pendingVideoPort);
+                ApplyVideoSessionKeys();
+                _videoCall.Start();
+                _isVideoActive = true;
+                ShowVideoOverlay(true);
+                ApplyCameraButtonVisuals();
+
+                string ip = GetLocalIPAddress();
+                SendVideoAcceptRoute(true, ip, _videoPort);
+                NotifyTransportStatus("Видео: соединение P2P (Kuznechik + Streebog).");
+            }
+            catch (Exception ex)
+            {
+                _viewModel.AddSystemMessage("Видео: " + ex.Message);
+                SendVideoAcceptRoute(false, string.Empty, 0);
+                EndVideoInternal(showMessage: false);
+            }
+        }
+
+        private void OnDirectVideoAccept(bool accept, string host, int port)
+        {
+            if (!accept)
+            {
+                _viewModel.AddSystemMessage("Собеседник отклонил видео.");
+                EndVideoInternal(showMessage: false);
+                return;
+            }
+
+            _videoCall?.SetRemote(host, port);
+        }
+
+        private async Task GenerateVideoSessionKeysAsync()
+        {
+            _videoSessionKey = new byte[32];
+            _videoIV = new byte[16];
+            _videoMacKey = new byte[32];
+
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(_videoSessionKey);
+                rng.GetBytes(_videoIV);
+                rng.GetBytes(_videoMacKey);
+            }
+
+            await Task.CompletedTask;
+        }
+
+        private void EnsureVideoCall()
+        {
+            if (_videoCall != null)
+                return;
+
+            _videoCall = new SimpleVideoCall(Dispatcher);
+            _videoCall.LocalFrameCaptured += src =>
+                Dispatcher.BeginInvoke(new Action(() => ApplyLocalVideoFrame(src)));
+            _videoCall.RemoteFrameReceived += src =>
+                Dispatcher.BeginInvoke(new Action(() => ApplyRemoteVideoFrame(src)));
+            _videoCall.StatusChanged += NotifyTransportStatus;
+        }
+
+        private void ApplyLocalVideoFrame(ImageSource source)
+        {
+            LocalVideoImage.Source = source;
+            OverlayLocalVideoImage.Source = source;
+            UpdateVideoTilePresentation();
+        }
+
+        private void ApplyRemoteVideoFrame(ImageSource source)
+        {
+            RemoteVideoImage.Source = source;
+            OverlayRemoteVideoImage.Source = source;
+            UpdateVideoTilePresentation();
+        }
+
+        private void UpdateVideoTilePresentation()
+        {
+            bool showTiles = _isVideoActive && _viewModel.IsCallActive;
+            var visible = showTiles ? Visibility.Visible : Visibility.Collapsed;
+            var hidden = showTiles ? Visibility.Collapsed : Visibility.Visible;
+
+            LocalVideoImage.Visibility = LocalVideoImage.Source != null && showTiles
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            RemoteVideoImage.Visibility = RemoteVideoImage.Source != null && showTiles
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            MyAvatarBorder.Visibility = LocalVideoImage.Visibility == Visibility.Visible ? hidden : visible;
+            PeerAvatarBorder.Visibility = RemoteVideoImage.Visibility == Visibility.Visible ? hidden : visible;
+        }
+
+        private void ApplyVideoSessionKeys()
+        {
+            if (_videoCall == null || _videoSessionKey == null || _videoIV == null || _videoMacKey == null)
+                return;
+
+            _videoCall.SetSessionKeys(_videoSessionKey, _videoIV, _videoMacKey);
+        }
+
+        private void ShowVideoOverlay(bool visible)
+        {
+            if (_viewModel.IsCallActive)
+            {
+                VideoOverlay.Visibility = Visibility.Collapsed;
+                UpdateVideoTilePresentation();
+                ApplyCameraButtonVisuals();
+                return;
+            }
+
+            VideoOverlay.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            if (!visible)
+            {
+                LocalVideoImage.Source = null;
+                RemoteVideoImage.Source = null;
+                OverlayLocalVideoImage.Source = null;
+                OverlayRemoteVideoImage.Source = null;
+            }
+
+            UpdateVideoTilePresentation();
+            ApplyCameraButtonVisuals();
+        }
+
+        private void EndVideoInternal(bool showMessage)
+        {
+            _videoCall?.Stop();
+            _videoCall?.Dispose();
+            _videoCall = null;
+            _isVideoActive = false;
+            ShowVideoOverlay(false);
+
+            if (_videoSessionKey != null)
+                Array.Clear(_videoSessionKey, 0, _videoSessionKey.Length);
+            if (_videoIV != null)
+                Array.Clear(_videoIV, 0, _videoIV.Length);
+            if (_videoMacKey != null)
+                Array.Clear(_videoMacKey, 0, _videoMacKey.Length);
+
+            _videoSessionKey = null;
+            _videoIV = null;
+            _videoMacKey = null;
+
+            if (showMessage)
+                _viewModel.AddSystemMessage("Видеозвонок завершён.");
+        }
+
+        private byte[] ProtectVideoSession(byte[] sessionKey, byte[] iv, byte[] macKey)
+        {
+            if (kuznechik == null || aesKey == null)
+                throw new InvalidOperationException("Сеансовый ключ чата ещё не выведен.");
+
+            byte[] payload = new byte[80];
+            Array.Copy(sessionKey, 0, payload, 0, 32);
+            Array.Copy(iv, 0, payload, 32, 16);
+            Array.Copy(macKey, 0, payload, 48, 32);
+            return kuznechik.KuzEncript(payload, aesKey);
+        }
+
+        private bool TryUnprotectVideoSession(byte[] blob, out byte[] sessionKey, out byte[] iv, out byte[] macKey)
+        {
+            sessionKey = null;
+            iv = null;
+            macKey = null;
+            if (blob == null || kuznechik == null || aesKey == null)
+                return false;
+
+            byte[] plain = kuznechik.KuzDecript(blob, aesKey);
+            if (plain == null || plain.Length != 80)
+                return false;
+
+            sessionKey = new byte[32];
+            iv = new byte[16];
+            macKey = new byte[32];
+            Array.Copy(plain, 0, sessionKey, 0, 32);
+            Array.Copy(plain, 32, iv, 0, 16);
+            Array.Copy(plain, 48, macKey, 0, 32);
+            return true;
+        }
+
+        private void SendVideoKeysRoute(byte[] protectedBlob)
+        {
+            if (_directPeer?.IsConnected == true)
+                _directPeer.SendVideoKeys(protectedBlob);
+        }
+
+        private void SendVideoInviteRoute(string host, int port)
+        {
+            if (_directPeer?.IsConnected == true)
+                _directPeer.SendVideoInvite(host, port);
+        }
+
+        private void SendVideoAcceptRoute(bool accept, string host, int port)
+        {
+            if (_directPeer?.IsConnected == true)
+                _directPeer.SendVideoAccept(accept, host, port);
+        }
+
+        private int GetVideoPortFromFile()
+        {
+            try
+            {
+                if (File.Exists(VideoPortFile))
+                {
+                    string content = File.ReadAllText(VideoPortFile).Trim();
+                    if (int.TryParse(content, out int port) && port >= VideoPortMin && port <= VideoPortMax)
+                    {
+                        int nextPort = port >= VideoPortMax ? VideoPortMin : port + 1;
+                        File.WriteAllText(VideoPortFile, nextPort.ToString());
+                        return port;
+                    }
+                }
+
+                int newPort = new Random().Next(VideoPortMin, VideoPortMax);
+                File.WriteAllText(VideoPortFile, (newPort + 1).ToString());
+                return newPort;
+            }
+            catch
+            {
+                return new Random().Next(VideoPortMin, VideoPortMax);
+            }
+        }
+
+        private int GetDirectPortFromFile()
+        {
+            try
+            {
+                if (File.Exists(DirectPortFile))
+                {
+                    string content = File.ReadAllText(DirectPortFile).Trim();
+                    if (int.TryParse(content, out int port) && port >= DirectPortMin && port <= DirectPortMax)
+                    {
+                        int nextPort = port >= DirectPortMax ? DirectPortMin : port + 1;
+                        File.WriteAllText(DirectPortFile, nextPort.ToString());
+                        return port;
+                    }
+                }
+
+                int newPort = new Random().Next(DirectPortMin, DirectPortMax);
+                File.WriteAllText(DirectPortFile, (newPort + 1).ToString());
+                return newPort;
+            }
+            catch
+            {
+                return new Random().Next(DirectPortMin, DirectPortMax);
+            }
         }
 
         private int GetPortFromFile()
@@ -720,8 +1534,7 @@ namespace ChatClient
                 rng.GetBytes(_voiceIV);
             }
 
-            if (CanTalkToServer)
-                await client.SendVoiceKeysAsync(ID, ProtectVoiceKeys(_voiceSessionKey, _voiceIV), Array.Empty<byte>());
+            await SendVoiceKeysRouteAsync(ProtectVoiceKeys(_voiceSessionKey, _voiceIV), Array.Empty<byte>());
         }
 
         public void ReceiveVoiceKeys(int fromUserId, byte[] sessionKey, byte[] iv)
@@ -741,15 +1554,19 @@ namespace ChatClient
 
         private SimpleVoiceCall CreateVoiceCall(bool microphoneEnabled)
         {
-            var call = new SimpleVoiceCall(client, ID);
+            var call = new SimpleVoiceCall(_directP2PActive ? null : client, ID);
             call.SetMicrophoneEnabled(microphoneEnabled);
             call.SetEncryptionEnabled(true);
-            call.OnStatusChanged += msg => Dispatcher.BeginInvoke(new Action(() => _viewModel.AddSystemMessage(msg)));
+            call.OnStatusChanged += msg => Dispatcher.BeginInvoke(new Action(() => NotifyTransportStatus(msg)));
             call.OnVolumeChanged += level =>
             {
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    MyGlowBorder.Opacity = level > 0.05f && !_isMuted ? 0.5 + (level * 0.5) : 0;
+                    MyGlowBorder.Opacity = level > 0.05f && !_isMuted ? 1 : 0;
+                    if (level > 0.08f && !_isMuted)
+                        SetMyVoiceStatus("Говорите…");
+                    else if (!_isMuted)
+                        SetMyVoiceStatus(null);
                 }));
             };
             return call;
