@@ -98,7 +98,7 @@ namespace ChatClient
             _signature = new GostSignature();
             _signPublicKey = _signature.GetPublicKey();
 
-            _hubUrl = ConfigurationManager.AppSettings["ChatHubUrl"] ?? "http://localhost:8080/chat";
+            _hubUrl = ConfigurationManager.AppSettings["ChatHubUrl"] ?? "http://179.66.184.184:8080/chat";
             client = new ChatHubClient(_hubUrl);
             client.GetConnectionAndPublicKey += GetConnectionAndPublicKey;
             client.GetConnectionProtocol += GetConnectionProtocol;

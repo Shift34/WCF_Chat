@@ -11,7 +11,7 @@
     </StackPanel>
 
     <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" Margin="0,14,0,10">
-      <TextBox x:Name="HubUrl" Watermark="http://host:8080/chat" Text="http://127.0.0.1:8080/chat"/>
+      <TextBox x:Name="HubUrl" Watermark="http://host:8080/chat" Text="http://179.66.184.184:8080/chat"/>
       <Button Grid.Column="1" Margin="8,0,0,0" Content="Подключиться" Click="Connect_Click"/>
       <Button Grid.Column="2" Margin="8,0,0,0" x:Name="FindButton" Content="Найти" Click="Find_Click" IsEnabled="False"/>
     </Grid>
