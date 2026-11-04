@@ -24,6 +24,26 @@ Version **0.0.1**.
 - .NET Framework 4.8 and a Windows machine to run the WPF client
 - Visual Studio 2022 or `dotnet` CLI
 
+## Cross-platform client (Windows, macOS, Linux, Android)
+
+Shared protocol library: `ChatCore` (GOST handshake compatible with the WPF client).
+UI: Avalonia.
+
+Desktop (Windows, macOS, Linux):
+
+```bash
+dotnet run --project ChatClient.Cross.Desktop
+```
+
+Android (needs the `android` workload and a device or emulator):
+
+```bash
+dotnet build ChatClient.Cross.Android -c Debug
+dotnet build ChatClient.Cross.Android -c Debug -t:Run
+```
+
+Point the hub URL at the machine running `ChatServer`. On the Android emulator use `http://10.0.2.2:8080/chat` if the server listens on the host. Voice and video stay in the Windows WPF client (`ChatClient`).
+
 ## How to run
 
 ### 1. Start the server
